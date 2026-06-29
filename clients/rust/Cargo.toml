@@ -1,8 +1,9 @@
 [package]
 name = "provetrail"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
-description = "Verifier for the Provetrail standard (verifiable execution provenance)."
+description = "Verifier for the Provetrail standard (verifiable execution provenance): checks a sealed run record's signature and Merkle integrity."
+readme = "README.md"
 license = "Apache-2.0"
 repository = "https://github.com/ionalpha/provetrail"
 homepage = "https://provetrail.org"
