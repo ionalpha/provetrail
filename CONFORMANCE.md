@@ -52,8 +52,8 @@ A `manifest.json` entry has the shape:
 
 A verifier declares the highest tier it meets. The differentiation between a real implementation and a shallow one lives at the upper tiers: a structural-only verifier can pass L1 and L2 but fails L3 and L4, and the suite makes that gap legible.
 
-- **L1 Structural** - canonical (CDE) encoding conformance, schema validity, well-formed envelope, chain-link presence, `seq` monotonicity, fold consistency. No cryptography required.
-- **L2 Cryptographic** - COSE signature validity, key binding, algorithm pinning (no algorithm substitution), hash-chain integrity over carried bytes.
+- **L1 Structural** - canonical (CDE) encoding conformance, schema validity, well-formed envelope, `seq` monotonicity, fold consistency. No cryptography required.
+- **L2 Cryptographic** - COSE signature validity, key binding, algorithm pinning (no algorithm substitution), Merkle-leaf integrity over carried bytes (each event's leaf is committed under the signed root).
 - **L3 Transparency** - RFC 9162 inclusion proof against a signed root, consistency proof between two roots, receipt validity.
 - **L4 Governance-complete** - every side-effecting action has a matching admission record; recorded gate results are consistent with the action stream; outcome claims are bound to a check.
 
@@ -61,12 +61,12 @@ A verifier declares the highest tier it meets. The differentiation between a rea
 
 ## 4. Valid vectors (MUST accept)
 
-- `valid.minimal.01` - single genesis event, self-consistent fold, one signature.
-- `valid.chain.multi_event.01` - N ordered events, intact hash chain, monotonic `seq`.
+- `valid.minimal.01` - single event, self-consistent fold, one signature.
+- `valid.chain.multi_event.01` - N ordered events committed under one signed root, monotonic `seq`.
 - `valid.upcast.01` - a record at an older `schema_version` that the upcast rule still verifies.
 - `valid.multisig.01` - multiple COSE signatures over one statement.
 - `valid.receipt.01` - a signed statement plus a valid RFC 9162 inclusion proof and signed root.
-- `valid.redacted.01` - a holder-elided payload field where the record still verifies (selective disclosure without breaking the chain).
+- `valid.redacted.01` - a holder-elided payload field where the record still verifies (selective disclosure without breaking inclusion under the signed root).
 - `valid.governed.01` - a full L4 record: an action with its admission record, gate results, and a check-bound outcome.
 
 ---
@@ -78,8 +78,7 @@ A verifier declares the highest tier it meets. The differentiation between a rea
 - `enc.duplicate_map_key` - duplicate map keys.
 - `enc.indefinite_length` - indefinite-length items disallowed by the CDE profile.
 
-### Chain / ordering (L1)
-- `chain.broken_link` - an event whose `prev_hash` does not match the prior event's hash.
+### Ordering (L1)
 - `chain.non_monotonic_seq` - `seq` decreases or repeats.
 - `chain.seq_gap` - a missing `seq` (silent truncation of the middle of a run).
 - `chain.reordered` - events permuted so the fold differs from the signed state.

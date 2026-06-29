@@ -9,7 +9,7 @@ The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT, RE
 
 Identifiers are written in `code font`. This document avoids implementation-specific detail except where a concrete grounding aids clarity.
 
-A note on maturity: until the cryptographic layer (Sections 4.2 and 4.3) is implemented and shipped with a verifier, a Provetrail record provides **structural** integrity guarantees only. A producer or document MUST NOT describe a record as "cryptographically verifiable" or "tamper-evident" before that layer is present.
+A note on maturity: the cryptographic layer (Sections 4.2 and 4.3) is implemented and shipped with a verifier in the reference implementation, so a record can be cryptographically verified against a signing key today. The on-the-wire format is not yet frozen, and the golden conformance vectors are still being published into this repository, so the format is a working draft and MUST NOT be relied on as a production security control before the v0.1.0 freeze.
 
 ---
 
@@ -44,7 +44,8 @@ The envelope is the wire format of one immutable, ordered event. An event has th
 | `payload` | object | The type-specific body. |
 | `schema_version` | uint64 | The schema version of `payload` for this `type`. |
 | `causation_id` | string | OPTIONAL. The id of the event that caused this one, enabling exact causal replay. |
-| `prev_hash` | bytes | The hash of the previous event's canonical bytes in this stream (Section 4.1). Absent only on the genesis event. |
+
+Ordering within a stream is carried by `seq` alone. Tamper-evidence is not a per-event field: each event's canonical bytes are committed as a leaf in the append-only Merkle log of Section 4, and the signed root over those leaves is what makes any alteration detectable. There is therefore no `prev_hash` field.
 
 **Standardizable contract:**
 
@@ -72,7 +73,7 @@ The three primitives compose: the **envelope** is the substrate, the **gate cont
 
 ## 3. Canonicalization and cross-language verification
 
-A hash chain is only verifiable in another language if that language can reproduce the exact hashed bytes. Provetrail resolves this with a hybrid rule.
+A Merkle log is only verifiable in another language if that language can reproduce the exact hashed leaf bytes. Provetrail resolves this with a hybrid rule.
 
 ### 3.1 Carry the bytes, rehash the bytes
 
@@ -100,9 +101,9 @@ A non-canonical JSON projection of a record MAY be produced for human inspection
 
 Provetrail assembles existing standards. It does not invent cryptography.
 
-### 4.1 Hash chain
+### 4.1 Event commitment
 
-Each event carries `prev_hash`, the hash of the previous event's canonical bytes in the same stream, forming a tamper-evident chain. The hash function is SHA-256 unless a later profile specifies otherwise. The genesis event has no `prev_hash`.
+Each event's canonical bytes are committed as a leaf in the append-only Merkle log of Section 4.3. The leaf preimage is domain-separated and length-framed (the leaf is the hash of a fixed domain tag, the canonical byte length, and the canonical bytes), so two different events can never share a preimage. The hash function is SHA-256 (RFC 6962 leaf hashing) unless a later profile specifies otherwise. The signed root over these leaves, not a per-event back-pointer, is the tamper-evidence: altering, reordering, dropping, or inserting any event no longer reproduces the signed root.
 
 ### 4.2 Signing
 
@@ -135,7 +136,7 @@ The signed payload is a `run-provenance` statement (see [`predicates/run-provena
 Conformance is defined by the public test-vector suite and tier model in [`CONFORMANCE.md`](./CONFORMANCE.md). In summary, a verifier declares the tier it meets:
 
 - **L1 Structural** - canonical-encoding conformance, schema validity, chain-link presence, `seq` monotonicity, fold consistency. No cryptography required.
-- **L2 Cryptographic** - signature validity, key binding, algorithm pinning, hash-chain integrity over carried bytes.
+- **L2 Cryptographic** - signature validity, key binding, algorithm pinning, Merkle-leaf integrity over carried bytes (each event's leaf is committed under the signed root).
 - **L3 Transparency** - inclusion and consistency proofs against signed roots; receipt validity.
 - **L4 Governance-complete** - every side-effecting action has a matching admission record; recorded gate results are consistent with the action stream; outcome claims are bound to a check.
 
