@@ -1,0 +1,38 @@
+name: Release crate
+
+# Publishes clients/rust to crates.io and attaches a GitHub build-provenance
+# attestation for the packaged .crate (verifiable with `gh attestation verify`),
+# since crates.io has no native provenance channel. Manual trigger only: bump the
+# version in clients/rust/Cargo.toml, then run this.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-crate
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for the build-provenance attestation
+      attestations: write
+    defaults:
+      run:
+        working-directory: clients/rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test
+      - run: cargo package
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: clients/rust/target/package/provetrail-*.crate
+      - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

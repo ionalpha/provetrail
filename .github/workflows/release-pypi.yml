@@ -1,0 +1,41 @@
+name: Release PyPI package
+
+# Publishes clients/python to PyPI via trusted publishing (OIDC, no stored token)
+# and attaches PEP 740 digital attestations. Manual trigger only: bump the version
+# in clients/python/pyproject.toml, then run this.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-pypi
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # required for trusted publishing + attestations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test
+        working-directory: clients/python
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[test]"
+          pytest -q
+      - name: Build
+        working-directory: clients/python
+        run: |
+          pip install build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: clients/python/dist
