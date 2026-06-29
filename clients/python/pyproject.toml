@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "provetrail"
-version = "0.0.1"
-description = "Official verifier and tooling for the Provetrail standard (verifiable execution provenance). Reference implementation in progress."
+version = "0.1.0"
+description = "Verifier for the Provetrail standard (verifiable execution provenance): checks a sealed run record's signature and Merkle integrity."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Apache-2.0" }
@@ -20,12 +20,22 @@ keywords = [
     "attestation",
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Topic :: Security :: Cryptography",
     "Topic :: Software Development :: Libraries",
 ]
+dependencies = [
+    "cbor2>=5.4",
+    "cryptography>=41",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+provetrail = "provetrail.__main__:main"
 
 [project.urls]
 Homepage = "https://provetrail.org"

@@ -1,15 +1,17 @@
-"""Provetrail: official verifier and tooling (placeholder).
+"""Provetrail: a verifier for verifiable execution provenance records.
 
-The reference implementation is in progress. This package currently reserves
-the canonical name and points to the specification. See https://provetrail.org
-and https://github.com/ionalpha/provetrail for the specification and the
-conformance suite.
+This package verifies the integrity of a sealed run record: the COSE_Sign1
+checkpoint signature is valid under a given Ed25519 key, and the carried events
+rebuild the signed RFC 9162 Merkle root. It follows the carry-the-bytes rule: it
+rehashes the exact bytes the record carries and never re-serializes, so it agrees
+with any other conformant verifier on the same record.
 
-When the cryptographic layer of the standard lands, this package will verify
-Provetrail records against the published conformance vectors.
+See https://provetrail.org and https://github.com/ionalpha/provetrail for the
+specification and the conformance suite.
 """
 
-__version__ = "0.0.1"
+from .verify import Verified, VerifyError, verify_run
 
-STATUS = "draft"
-SPEC_URL = "https://github.com/ionalpha/provetrail"
+__all__ = ["verify_run", "Verified", "VerifyError", "__version__"]
+
+__version__ = "0.1.0"

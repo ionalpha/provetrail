@@ -1,7 +1,7 @@
 {
   "name": "provetrail",
-  "version": "0.0.1",
-  "description": "Official verifier and tooling for the Provetrail standard (verifiable execution provenance). Reference implementation in progress.",
+  "version": "0.1.0",
+  "description": "Verifier for the Provetrail standard (verifiable execution provenance): checks a sealed run record's signature and Merkle integrity.",
   "keywords": [
     "provetrail",
     "verifiable-execution",
@@ -24,8 +24,15 @@
   "author": "Ion Alpha <contact@ionalpha.io>",
   "type": "module",
   "main": "index.js",
+  "bin": {
+    "provetrail": "cli.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
   "files": [
     "index.js",
+    "cli.js",
     "README.md"
   ],
   "publishConfig": {
@@ -33,5 +40,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "cbor2": "^1.12.0"
   }
 }
