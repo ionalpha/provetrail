@@ -18,6 +18,8 @@ Autonomous and semi-autonomous agents increasingly take real actions: calling to
 
 A Provetrail record is an append-only, ordered log of events, where the run's state is a deterministic function of the log (replay = re-fold), each event carries the authority it ran under, and every event is committed as a leaf in an append-only Merkle log under a signed root, so any alteration is detectable.
 
+For the design rationale, why a record is only as trustworthy as the runtime that emits it, and what separates a *signed* record from a *proven* one, see [Proof requires a runtime](docs/proof-requires-a-runtime.md).
+
 ## What it is not
 
 Provetrail is deliberately one layer in a stack, and complements rather than replaces the neighbouring standards:
@@ -53,6 +55,7 @@ Conformance is defined by a public test-vector suite (see [`CONFORMANCE.md`](./C
 SPEC.md                      the specification (DRAFT v0.1.0)
 CONFORMANCE.md               the conformance vector suite design + failure-code registry
 predicates/run-provenance.md the run-provenance statement/predicate definition
+docs/                        design rationale (the "signed vs proven" argument)
 vectors/                     the published conformance vectors (structural L1 and cryptographic L2-L4)
 clients/                     independent verifiers (the provetrail crate, PyPI, and npm packages)
 LICENSE                      Apache-2.0 (code, schemas, vectors)
