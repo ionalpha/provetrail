@@ -10,10 +10,10 @@
 The predicate type identifier is descriptive and vendor-neutral:
 
 ```
-https://provetrail.org/predicates/run-provenance/v0.1
+https://w3id.org/provetrail/predicates/run-provenance/v0.1
 ```
 
-(The identifier is the stable contract; the domain hosting it is the canonical reference. It is not bound to any single implementation.)
+(The identifier is the stable contract. It is a permanent identifier on the W3C Permanent Identifier service (`w3id.org`) that redirects to the current canonical reference, so it stays fixed even if the hosting moves. It is not bound to any single implementation.)
 
 ## Carriers
 
