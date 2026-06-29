@@ -1,0 +1,37 @@
+{
+  "name": "provetrail",
+  "version": "0.0.1",
+  "description": "Official verifier and tooling for the Provetrail standard (verifiable execution provenance). Reference implementation in progress.",
+  "keywords": [
+    "provetrail",
+    "verifiable-execution",
+    "provenance",
+    "agents",
+    "audit",
+    "transparency-log",
+    "attestation"
+  ],
+  "homepage": "https://provetrail.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ionalpha/provetrail.git",
+    "directory": "clients/npm"
+  },
+  "bugs": {
+    "url": "https://github.com/ionalpha/provetrail/issues"
+  },
+  "license": "Apache-2.0",
+  "author": "Ion Alpha <contact@ionalpha.io>",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

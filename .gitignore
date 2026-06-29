@@ -1,0 +1,16 @@
+# Node
+node_modules/
+*.tgz
+npm-debug.log*
+
+# Python
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db

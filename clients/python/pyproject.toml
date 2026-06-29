@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "provetrail"
+version = "0.0.1"
+description = "Official verifier and tooling for the Provetrail standard (verifiable execution provenance). Reference implementation in progress."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Ion Alpha", email = "contact@ionalpha.io" }]
+keywords = [
+    "provetrail",
+    "verifiable-execution",
+    "provenance",
+    "agents",
+    "audit",
+    "transparency-log",
+    "attestation",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Security :: Cryptography",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://provetrail.org"
+Repository = "https://github.com/ionalpha/provetrail"
+Issues = "https://github.com/ionalpha/provetrail/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/provetrail"]

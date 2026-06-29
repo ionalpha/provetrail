@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+title: "Provetrail: an open standard for verifiable execution provenance"
+message: "If you reference or build on this specification, please cite it using the metadata below."
+type: software
+abstract: >-
+  Provetrail is an open, vendor-neutral standard for verifiable execution
+  provenance: a portable, third-party-verifiable record of what an agent did,
+  in what order, and under what governance, anchored to an append-only,
+  tamper-evident event log. This draft defines the record format, its
+  canonicalization, and the conformance suite.
+authors:
+  - name: "Ion Alpha"
+    website: "https://provetrail.org"
+repository-code: "https://github.com/ionalpha/provetrail"
+url: "https://provetrail.org"
+license: CC-BY-4.0
+version: 0.1.0-draft
+date-released: "2026-06-29"
+keywords:
+  - verifiable execution
+  - execution provenance
+  - agents
+  - audit
+  - transparency log
+  - tamper-evident log
+  - conformance
