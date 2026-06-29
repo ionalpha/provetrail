@@ -2,6 +2,8 @@
 
 **An open standard for verifiable execution provenance: a portable, third-party-verifiable record of what an agent did, in what order, and under what governance.**
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21044070.svg)](https://doi.org/10.5281/zenodo.21044070)
+
 > **Status: DRAFT (pre-1.0).** This repository publishes the specification, the conformance design, and the signed conformance vectors. A reference verifier ships in the Flynn runtime, and independent verifiers in Rust, Python, and JavaScript live in [`clients/`](./clients). The on-the-wire format is not frozen until v0.1.0, so nothing here should yet be relied on as a production security control. See [Status and roadmap](#status-and-roadmap).
 
 ---

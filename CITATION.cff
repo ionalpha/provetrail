@@ -16,6 +16,10 @@ url: "https://provetrail.org"
 license: CC-BY-4.0
 version: 0.1.0-draft
 date-released: "2026-06-29"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21044070"
+    description: "Zenodo archive of the v0.1.0-draft release."
 keywords:
   - verifiable execution
   - execution provenance
