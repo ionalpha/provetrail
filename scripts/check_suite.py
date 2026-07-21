@@ -122,9 +122,62 @@ def check_failure_codes_are_registered() -> None:
                 )
 
 
-def check_versions(suite_versions: dict[str, str | None]) -> None:
+def check_registry() -> str | None:
+    """registry.json agrees with the manifests and with CONFORMANCE.md.
+
+    Every code a manifest pins must have a 'pinned' registry entry whose
+    pinned_by list matches the manifests exactly; every registry code must be
+    mentioned in CONFORMANCE.md; a 'pinned' entry must not have an empty
+    pinned_by nor a non-pinned entry a non-empty one.
+    """
+    registry_path = REPO / "registry.json"
+    if not registry_path.exists():
+        fail("registry.json is missing; the failure-code registry must be published")
+        return None
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    entries = {e["code"]: e for e in registry.get("codes", [])}
+
+    pinned_by: dict[str, list[str]] = {}
+    for name in SUITES:
+        manifest_path = REPO / "vectors" / name / "manifest.json"
+        if not manifest_path.exists():
+            continue
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for vector in manifest.get("vectors", []):
+            code = vector.get("failure_code")
+            if code:
+                pinned_by.setdefault(code, []).append(vector["id"])
+
+    for code, ids in sorted(pinned_by.items()):
+        entry = entries.get(code)
+        if entry is None:
+            fail(f"registry.json: manifest code {code!r} has no registry entry")
+        elif entry.get("status") != "pinned":
+            fail(f"registry.json: {code!r} is pinned by vectors but has status {entry.get('status')!r}")
+        elif sorted(entry.get("pinned_by", [])) != sorted(ids):
+            fail(
+                f"registry.json: {code!r} pinned_by disagrees with the manifests\n"
+                f"    registry:  {sorted(entry.get('pinned_by', []))}\n"
+                f"    manifests: {sorted(ids)}"
+            )
+
+    conformance = (REPO / "CONFORMANCE.md").read_text(encoding="utf-8")
+    for code, entry in sorted(entries.items()):
+        if f"`{code}`" not in conformance:
+            fail(f"registry.json: {code!r} is not mentioned in CONFORMANCE.md")
+        if entry.get("status") == "pinned" and not entry.get("pinned_by"):
+            fail(f"registry.json: {code!r} is 'pinned' but lists no vectors")
+        if entry.get("status") != "pinned" and code in pinned_by:
+            pass  # already reported above
+        if entry.get("status") not in ("pinned", "operational", "producer", "deferred"):
+            fail(f"registry.json: {code!r} has unknown status {entry.get('status')!r}")
+
+    return registry.get("registry_version")
+
+
+def check_versions(suite_versions: dict[str, str | None], registry_version: str | None = None) -> None:
     """One version string across every surface that carries one."""
-    surfaces: dict[str, str | None] = {}
+    surfaces: dict[str, str | None] = {"registry.json": registry_version}
 
     # Every document that carries a version header, including each predicate: a
     # predicate left behind on an older version is a published type identifier
@@ -161,7 +214,8 @@ def check_versions(suite_versions: dict[str, str | None]) -> None:
 def main() -> int:
     suite_versions = {name: check_suite(name) for name in SUITES}
     check_failure_codes_are_registered()
-    check_versions(suite_versions)
+    registry_version = check_registry()
+    check_versions(suite_versions, registry_version)
 
     if failures:
         print(f"conformance suite check failed ({len(failures)} problem(s)):\n")

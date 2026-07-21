@@ -1,0 +1,359 @@
+{
+  "_comment": [
+    "The Provetrail failure-code registry, machine-readable. CONFORMANCE.md",
+    "section 6 is the prose companion; scripts/check_suite.py enforces that the",
+    "two agree and that every code a manifest pins has a 'pinned' entry here",
+    "whose pinned_by list matches the manifests exactly.",
+    "",
+    "status: pinned = backed by published vectors (pinned_by lists them);",
+    "operational = verifier-side, emitted where no vector isolates the fault;",
+    "producer = emitted when producing a record, never by a verifier;",
+    "deferred = named so the tier boundary is explicit, NOT part of conformance",
+    "at this version."
+  ],
+  "registry_version": "0.1.0-draft",
+  "codes": [
+    {
+      "code": "chain.empty",
+      "tier": "L1",
+      "layer": "ordering",
+      "meaning": "An empty event stream.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.chain.empty.01"
+      ]
+    },
+    {
+      "code": "chain.non_monotonic_seq",
+      "tier": "L1",
+      "layer": "ordering",
+      "meaning": "seq decreases or repeats within a stream.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.chain.non_monotonic_seq.01"
+      ]
+    },
+    {
+      "code": "chain.stream_mismatch",
+      "tier": "L1",
+      "layer": "ordering",
+      "meaning": "Events that belong to different streams.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.chain.stream_mismatch.01"
+      ]
+    },
+    {
+      "code": "enc.decode",
+      "tier": "L1",
+      "layer": "encoding",
+      "meaning": "Bytes that do not decode as an event at all, for example a required field carrying the wrong CBOR type.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.schema.wrong_type.01"
+      ]
+    },
+    {
+      "code": "enc.duplicate_map_key",
+      "tier": "L1",
+      "layer": "encoding",
+      "meaning": "Duplicate map keys.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.enc.duplicate_map_key.01",
+        "invalid.enc.duplicate_map_key_full.01"
+      ]
+    },
+    {
+      "code": "enc.encode",
+      "layer": "encoding",
+      "meaning": "The logical event cannot be canonically encoded (for example a non-UTF-8 string field).",
+      "status": "operational"
+    },
+    {
+      "code": "enc.indefinite_length",
+      "tier": "L1",
+      "layer": "encoding",
+      "meaning": "Indefinite-length items, disallowed by the deterministic profile.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.enc.indefinite_length.01",
+        "invalid.enc.indefinite_length_full.01"
+      ]
+    },
+    {
+      "code": "enc.invalid_actor",
+      "tier": "L1",
+      "layer": "encoding",
+      "meaning": "An actor outside the closed category agent, human, system.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.schema.bad_actor.01"
+      ]
+    },
+    {
+      "code": "enc.invalid_utf8",
+      "tier": "L1",
+      "layer": "encoding",
+      "meaning": "A text string that is not valid UTF-8.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.enc.invalid_utf8.01"
+      ]
+    },
+    {
+      "code": "enc.non_canonical_cbor",
+      "tier": "L1",
+      "layer": "encoding",
+      "meaning": "Valid CBOR that is not the canonical encoding of the event it decodes to: unsorted map keys, non-minimal integer or length encoding, a missing required field, or an unknown extra field.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.enc.non_canonical_cbor.01",
+        "invalid.enc.non_minimal_int.01",
+        "invalid.schema.missing_field.01",
+        "invalid.schema.unknown_field.01"
+      ]
+    },
+    {
+      "code": "enc.time_out_of_range",
+      "layer": "encoding",
+      "meaning": "The event time is absent or outside the representable range.",
+      "status": "operational"
+    },
+    {
+      "code": "enc.trailing_bytes",
+      "tier": "L1",
+      "layer": "encoding",
+      "meaning": "Extra bytes after a complete encoding.",
+      "status": "pinned",
+      "pinned_by": [
+        "invalid.enc.trailing_bytes.01"
+      ]
+    },
+    {
+      "code": "gov.admission_denied_but_executed",
+      "tier": "L4",
+      "layer": "governance",
+      "meaning": "The admission decision was deny, yet the action appears as executed.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.governance.denied_but_executed.01"
+      ]
+    },
+    {
+      "code": "gov.containment_downgrade",
+      "layer": "governance",
+      "meaning": "An action ran at a weaker containment than its trust or grant required.",
+      "status": "deferred",
+      "tier": "L4"
+    },
+    {
+      "code": "gov.gate_result_contradiction",
+      "layer": "governance",
+      "meaning": "A recorded gate verdict contradicts the action it governs.",
+      "status": "deferred",
+      "tier": "L4"
+    },
+    {
+      "code": "gov.unadmitted_action",
+      "tier": "L4",
+      "layer": "governance",
+      "meaning": "A side-effecting action completed with no preceding admission record.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.governance.unadmitted_action.01"
+      ]
+    },
+    {
+      "code": "merkle.consistency_invalid",
+      "tier": "L3",
+      "layer": "transparency",
+      "meaning": "A consistency proof between two roots does not hold.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.consistency.forged_path.01"
+      ]
+    },
+    {
+      "code": "merkle.inclusion_invalid",
+      "tier": "L3",
+      "layer": "transparency",
+      "meaning": "An inclusion path does not reconstruct the signed root.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.event_proof.bad_inclusion.01"
+      ]
+    },
+    {
+      "code": "merkle.missing_node",
+      "tier": "L3",
+      "layer": "transparency",
+      "meaning": "An inclusion path shorter than the tree shape requires.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.event_proof.missing_node.01"
+      ]
+    },
+    {
+      "code": "record.decode",
+      "tier": "L2",
+      "layer": "record",
+      "meaning": "The record container does not decode: a duplicated container key, indefinite-length framing, trailing bytes, or events that are not byte strings.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.run.duplicate_container_key.01",
+        "crypto.run.events_not_bstr.01",
+        "crypto.run.indefinite_container.01",
+        "crypto.run.trailing_bytes.01"
+      ]
+    },
+    {
+      "code": "record.empty",
+      "tier": "L2",
+      "layer": "record",
+      "meaning": "The record carries no events, even under a validly signed size-0 checkpoint.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.run.empty_events.01"
+      ]
+    },
+    {
+      "code": "record.index_out_of_range",
+      "tier": "L3",
+      "layer": "transparency",
+      "meaning": "A proof index outside the signed tree size.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.event_proof.index_out_of_range.01"
+      ]
+    },
+    {
+      "code": "record.non_canonical",
+      "tier": "L2",
+      "layer": "record",
+      "meaning": "The record container decodes but is not in canonical form.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.run.non_canonical.01",
+        "crypto.run.non_minimal_head.01"
+      ]
+    },
+    {
+      "code": "record.root_mismatch",
+      "tier": "L2",
+      "layer": "record",
+      "meaning": "The events do not reproduce the signed root.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.run.root_mismatch.01"
+      ]
+    },
+    {
+      "code": "record.size_mismatch",
+      "tier": "L2",
+      "layer": "record",
+      "meaning": "The event count does not match the signed size.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.event_proof.size_mismatch.01",
+        "crypto.run.size_mismatch.01"
+      ]
+    },
+    {
+      "code": "shallow.empty_governance",
+      "layer": "ground-truth",
+      "meaning": "Structurally valid but carrying no admission or gate events.",
+      "status": "deferred",
+      "tier": "L4"
+    },
+    {
+      "code": "shallow.no_ground_truth",
+      "tier": "L4",
+      "layer": "ground-truth",
+      "meaning": "A claimed success with no binding to a passing check.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.ground_truth.failed_check.01",
+        "crypto.ground_truth.unbound_success.01"
+      ]
+    },
+    {
+      "code": "shallow.self_graded",
+      "layer": "ground-truth",
+      "meaning": "The record self-attests its own verdict, with no independent check.",
+      "status": "deferred",
+      "tier": "L4"
+    },
+    {
+      "code": "sign.bad_content_type",
+      "tier": "L2",
+      "layer": "signature",
+      "meaning": "The signed content type is missing or is not the checkpoint type.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.checkpoint.bad_content_type.01",
+        "crypto.checkpoint.missing_content_type.01",
+        "crypto.run.bad_content_type.01",
+        "crypto.run.missing_content_type.01"
+      ]
+    },
+    {
+      "code": "sign.bad_key",
+      "layer": "signature",
+      "meaning": "A signer or verifier was given a malformed key.",
+      "status": "producer"
+    },
+    {
+      "code": "sign.checkpoint_decode",
+      "tier": "L2",
+      "layer": "signature",
+      "meaning": "The signed payload is not the canonical encoding of a checkpoint: it does not decode, has a missing or extra field, non-canonical key order, or a root that is not a SHA-256 digest.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.checkpoint.payload_extra_field.01",
+        "crypto.checkpoint.payload_missing_origin.01",
+        "crypto.checkpoint.payload_non_canonical.01",
+        "crypto.checkpoint.payload_short_root.01",
+        "crypto.checkpoint.undecodable_payload.01"
+      ]
+    },
+    {
+      "code": "sign.empty_key_id",
+      "layer": "signature",
+      "meaning": "A signer was constructed with an empty key id.",
+      "status": "producer"
+    },
+    {
+      "code": "sign.sign_failed",
+      "layer": "signature",
+      "meaning": "The signing operation itself failed.",
+      "status": "producer"
+    },
+    {
+      "code": "sign.signature_invalid",
+      "tier": "L2",
+      "layer": "signature",
+      "meaning": "The signature does not verify under the named key, including a substituted algorithm identifier.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.checkpoint.alg_substitution.01",
+        "crypto.checkpoint.bad_signature.01",
+        "crypto.event_proof.bad_signature.01",
+        "crypto.run.alg_substitution.01",
+        "crypto.run.bad_signature.01"
+      ]
+    },
+    {
+      "code": "sign.unknown_key",
+      "tier": "L2",
+      "layer": "signature",
+      "meaning": "Signed by a key not in the verifier's keyring.",
+      "status": "pinned",
+      "pinned_by": [
+        "crypto.checkpoint.unknown_key.01",
+        "crypto.consistency.unknown_key.01",
+        "crypto.run.unknown_key.01"
+      ]
+    }
+  ]
+}

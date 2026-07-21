@@ -23,10 +23,11 @@ const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
 const manifest = haveVectors ? readJson(join(cryptoDir, "manifest.json")) : null;
 const scope = haveVectors ? readJson(join(here, "../../conformance-scope.json")) : null;
 
-// The root key comes from the manifest keyring, never pasted in here: a rotated
-// conformance key must not leave a stale copy behind that still passes.
-const rootKey = haveVectors
-  ? Buffer.from(manifest.keyring[0].public_key_hex, "hex")
+// The keyring comes from the manifest, never pasted in here: a rotated
+// conformance key must not leave a stale copy behind that still passes. Keyed
+// by key id, so sign.unknown_key is a reachable verdict.
+const keyring = haveVectors
+  ? new Map(manifest.keyring.map((k) => [k.key_id, Buffer.from(k.public_key_hex, "hex")]))
   : null;
 
 const isOutOfScope = (v) =>
@@ -57,11 +58,21 @@ test("the published suite agrees with the verifier", { skip: !haveVectors }, () 
     if (shouldAccept) {
       const why =
         v.expect === "accept" ? "should verify" : `is out of tier scope (${v.failure_code}) and must verify`;
-      assert.doesNotThrow(() => verifyRun(record, rootKey), `${v.id} ${why}`);
+      assert.doesNotThrow(() => verifyRun(record, keyring), `${v.id} ${why}`);
     } else {
+      // Not just any rejection: the registered code the vector pins. A wrong
+      // code means the client rejected for the wrong reason.
       assert.throws(
-        () => verifyRun(record, rootKey),
-        VerifyError,
+        () => verifyRun(record, keyring),
+        (err) => {
+          assert.ok(err instanceof VerifyError, `${v.id}: rejected with a non-VerifyError`);
+          assert.equal(
+            err.code,
+            v.failure_code,
+            `${v.id}: rejected with "${err.code}", the vector pins "${v.failure_code}"`,
+          );
+          return true;
+        },
         `${v.id} should be rejected (${v.failure_code})`,
       );
     }

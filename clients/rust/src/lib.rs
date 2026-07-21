@@ -27,16 +27,25 @@ struct Checkpoint {
     root: Vec<u8>,
 }
 
-/// Why a record failed verification.
+/// Why a record failed verification. [`VerifyError::code`] gives the registered
+/// failure code (CONFORMANCE.md section 6 / registry.json) for each variant.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum VerifyError {
-    /// The record or a field within it could not be decoded.
+    /// The record container could not be decoded.
     Decode(String),
     /// The record container is not in canonical form.
     NonCanonical,
-    /// The checkpoint signature did not verify under the given key.
+    /// The checkpoint signature (or its COSE framing or algorithm) did not verify.
     Signature,
+    /// The signed content type is missing or is not the checkpoint type.
+    BadContentType,
+    /// The signed payload is not the canonical encoding of a checkpoint.
+    CheckpointDecode(String),
+    /// The record was signed by a key not in the keyring.
+    UnknownKey,
+    /// The verifier was given a malformed key.
+    BadKey,
     /// The event count does not match the signed size.
     SizeMismatch,
     /// The events do not reproduce the signed root.
@@ -45,15 +54,53 @@ pub enum VerifyError {
     Empty,
 }
 
+impl VerifyError {
+    /// The registered failure code for this rejection.
+    pub fn code(&self) -> &'static str {
+        match self {
+            VerifyError::Decode(_) => "record.decode",
+            VerifyError::NonCanonical => "record.non_canonical",
+            VerifyError::Signature => "sign.signature_invalid",
+            VerifyError::BadContentType => "sign.bad_content_type",
+            VerifyError::CheckpointDecode(_) => "sign.checkpoint_decode",
+            VerifyError::UnknownKey => "sign.unknown_key",
+            VerifyError::BadKey => "sign.bad_key",
+            VerifyError::SizeMismatch => "record.size_mismatch",
+            VerifyError::RootMismatch => "record.root_mismatch",
+            VerifyError::Empty => "record.empty",
+        }
+    }
+}
+
 impl std::fmt::Display for VerifyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            VerifyError::Decode(m) => write!(f, "decode: {m}"),
-            VerifyError::NonCanonical => write!(f, "record container is not in canonical form"),
-            VerifyError::Signature => write!(f, "signature did not verify"),
-            VerifyError::SizeMismatch => write!(f, "event count does not match the signed size"),
-            VerifyError::RootMismatch => write!(f, "events do not reproduce the signed root"),
-            VerifyError::Empty => write!(f, "record carries no events"),
+            VerifyError::Decode(m) => write!(f, "{}: {m}", self.code()),
+            VerifyError::NonCanonical => write!(
+                f,
+                "{}: record container is not in canonical form",
+                self.code()
+            ),
+            VerifyError::Signature => write!(f, "{}: signature did not verify", self.code()),
+            VerifyError::BadContentType => {
+                write!(f, "{}: unexpected checkpoint content type", self.code())
+            }
+            VerifyError::CheckpointDecode(m) => write!(f, "{}: {m}", self.code()),
+            VerifyError::UnknownKey => {
+                write!(f, "{}: signed by a key not in the keyring", self.code())
+            }
+            VerifyError::BadKey => write!(f, "{}: malformed Ed25519 key", self.code()),
+            VerifyError::SizeMismatch => write!(
+                f,
+                "{}: event count does not match the signed size",
+                self.code()
+            ),
+            VerifyError::RootMismatch => write!(
+                f,
+                "{}: events do not reproduce the signed root",
+                self.code()
+            ),
+            VerifyError::Empty => write!(f, "{}: record carries no events", self.code()),
         }
     }
 }
@@ -66,9 +113,28 @@ pub struct Verified {
 }
 
 /// Verify a marshalled sealed run record against an Ed25519 public key, returning its
-/// events in order. Fails closed on a bad signature, a size mismatch, or events that
-/// do not rebuild the signed root.
+/// events in order. The key is trusted for any key id the record names; use
+/// [`verify_run_keyring`] to resolve the record's `kid` against a keyring instead.
 pub fn verify_run(record: &[u8], public_key: &[u8; 32]) -> Result<Verified, VerifyError> {
+    verify_run_inner(record, Keys::Single(public_key))
+}
+
+/// Verify a marshalled sealed run record against a keyring of key id → raw
+/// Ed25519 public key. The record's `kid` must resolve in the ring
+/// ([`VerifyError::UnknownKey`] otherwise).
+pub fn verify_run_keyring(
+    record: &[u8],
+    keyring: &std::collections::HashMap<String, [u8; 32]>,
+) -> Result<Verified, VerifyError> {
+    verify_run_inner(record, Keys::Ring(keyring))
+}
+
+enum Keys<'a> {
+    Single(&'a [u8; 32]),
+    Ring(&'a std::collections::HashMap<String, [u8; 32]>),
+}
+
+fn verify_run_inner(record: &[u8], keys: Keys<'_>) -> Result<Verified, VerifyError> {
     let (checkpoint, carried) = decode_container(record)?;
 
     if carried.is_empty() {
@@ -76,21 +142,28 @@ pub fn verify_run(record: &[u8], public_key: &[u8; 32]) -> Result<Verified, Veri
     }
 
     // The checkpoint is a tagged COSE_Sign1 (CBOR tag 18).
-    let sign1 = coset::CoseSign1::from_tagged_slice(&checkpoint)
-        .map_err(|e| VerifyError::Decode(format!("checkpoint: {e}")))?;
+    let sign1 =
+        coset::CoseSign1::from_tagged_slice(&checkpoint).map_err(|_| VerifyError::Signature)?;
     // The protected header is covered by the signature, but its claims must still
     // be OUR claims: the pinned algorithm and content type. A verifier that skips
     // this accepts an algorithm or type substitution.
     match &sign1.protected.header.content_type {
         Some(coset::ContentType::Text(t)) if t == CHECKPOINT_CONTENT_TYPE => {}
-        _ => return Err(VerifyError::Decode("unexpected checkpoint content type".into())),
+        _ => return Err(VerifyError::BadContentType),
     }
+    let public_key: [u8; 32] = match keys {
+        Keys::Single(k) => *k,
+        Keys::Ring(ring) => {
+            let kid = String::from_utf8_lossy(&sign1.protected.header.key_id);
+            *ring.get(kid.as_ref()).ok_or(VerifyError::UnknownKey)?
+        }
+    };
     if sign1.protected.header.alg
         != Some(coset::Algorithm::Assigned(coset::iana::Algorithm::Ed25519))
     {
-        return Err(VerifyError::Decode("unexpected checkpoint algorithm".into()));
+        return Err(VerifyError::Signature);
     }
-    let vk = VerifyingKey::from_bytes(public_key).map_err(|_| VerifyError::Signature)?;
+    let vk = VerifyingKey::from_bytes(&public_key).map_err(|_| VerifyError::BadKey)?;
     sign1
         .verify_signature(b"", |sig, tbs| {
             let signature = Signature::from_slice(sig).map_err(|_| ())?;
@@ -98,11 +171,9 @@ pub fn verify_run(record: &[u8], public_key: &[u8; 32]) -> Result<Verified, Veri
         })
         .map_err(|_| VerifyError::Signature)?;
 
-    let payload = sign1
-        .payload
-        .ok_or_else(|| VerifyError::Decode("checkpoint has no payload".into()))?;
+    let payload = sign1.payload.ok_or(VerifyError::Signature)?;
     let cp: Checkpoint = ciborium::from_reader(payload.as_slice())
-        .map_err(|e| VerifyError::Decode(e.to_string()))?;
+        .map_err(|e| VerifyError::CheckpointDecode(e.to_string()))?;
 
     let events = carried;
     if events.len() as u64 != cp.size {
@@ -128,20 +199,36 @@ fn decode_container(record: &[u8]) -> Result<(Vec<u8>, Vec<Vec<u8>>), VerifyErro
     let value: Value =
         ciborium::from_reader(record).map_err(|e| VerifyError::Decode(e.to_string()))?;
     // Beyond key order, the bytes must be the exact canonical encoding of what
-    // they decode to: this rejects indefinite-length framing, non-minimal heads,
-    // and trailing bytes, which a lenient decode would otherwise absorb.
-    let mut reencoded = Vec::with_capacity(record.len());
-    ciborium::into_writer(&value, &mut reencoded)
-        .map_err(|e| VerifyError::Decode(e.to_string()))?;
-    if reencoded != record {
-        return Err(VerifyError::NonCanonical);
+    // they decode to. A lenient decode absorbs several distinct defects, so the
+    // head and a prefix comparison classify them: an indefinite or duplicated-key
+    // map and trailing bytes are decode-level faults; anything else that fails the
+    // re-encoding comparison (a non-minimal head) is a canonical-form fault.
+    if record.first().is_some_and(|b| b & 0x1f == 31) {
+        return Err(VerifyError::Decode(
+            "record container is indefinite-length".into(),
+        ));
     }
     let Value::Map(entries) = value else {
         return Err(VerifyError::Decode("record is not a map".into()));
     };
-
     let keys: Vec<Option<&str>> = entries.iter().map(|(k, _)| k.as_text()).collect();
+    for (i, k) in keys.iter().enumerate() {
+        if keys[..i].contains(k) {
+            return Err(VerifyError::Decode(
+                "record container has a duplicated key".into(),
+            ));
+        }
+    }
     if keys != [Some("events"), Some("checkpoint")] {
+        return Err(VerifyError::NonCanonical);
+    }
+    let mut reencoded = Vec::with_capacity(record.len());
+    ciborium::into_writer(&Value::Map(entries.clone()), &mut reencoded)
+        .map_err(|e| VerifyError::Decode(e.to_string()))?;
+    if reencoded != record {
+        if record.len() > reencoded.len() && record[..reencoded.len()] == reencoded[..] {
+            return Err(VerifyError::Decode("record has trailing bytes".into()));
+        }
         return Err(VerifyError::NonCanonical);
     }
 

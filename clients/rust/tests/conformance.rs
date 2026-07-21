@@ -70,10 +70,22 @@ fn the_published_suite_agrees_with_the_verifier() {
     let supported = strings(&scope, "kinds_supported");
     let out_of_scope = strings(&scope, "out_of_scope_failure_prefixes");
 
-    // The root key comes from the manifest keyring, never pasted in here: a rotated
-    // conformance key must not leave a stale copy behind that still passes.
-    let key_hex = manifest["keyring"][0]["public_key_hex"].as_str().unwrap();
-    let root_key: [u8; 32] = hex::decode(key_hex).unwrap().try_into().unwrap();
+    // The keyring comes from the manifest, never pasted in here: a rotated
+    // conformance key must not leave a stale copy behind that still passes. Keyed
+    // by key id, so sign.unknown_key is a reachable verdict.
+    let keyring: std::collections::HashMap<String, [u8; 32]> = manifest["keyring"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| {
+            let id = k["key_id"].as_str().unwrap().to_string();
+            let key: [u8; 32] = hex::decode(k["public_key_hex"].as_str().unwrap())
+                .unwrap()
+                .try_into()
+                .unwrap();
+            (id, key)
+        })
+        .collect();
 
     let mut checked = 0;
     for vector in manifest["vectors"].as_array().unwrap() {
@@ -85,7 +97,7 @@ fn the_published_suite_agrees_with_the_verifier() {
 
         let id = vector["id"].as_str().unwrap();
         let record = std::fs::read(dir.join(vector["artifact"].as_str().unwrap())).unwrap();
-        let result = provetrail::verify_run(&record, &root_key);
+        let result = provetrail::verify_run_keyring(&record, &keyring);
 
         // A reject vector whose failure is above the integrity tier is intact at this
         // tier, so this client must accept it: rejecting would claim a tier it does not
@@ -93,11 +105,18 @@ fn the_published_suite_agrees_with_the_verifier() {
         if vector["expect"] == "accept" || is_out_of_scope(vector, &out_of_scope) {
             assert!(result.is_ok(), "{id} should verify, got {:?}", result.err());
         } else {
-            assert!(
-                result.is_err(),
-                "{id} should be rejected ({})",
-                vector["failure_code"].as_str().unwrap_or("?")
-            );
+            // Not just any rejection: the registered code the vector pins. A wrong
+            // code means the client rejected for the wrong reason.
+            let pinned = vector["failure_code"].as_str().unwrap();
+            match result {
+                Ok(_) => panic!("{id} should be rejected ({pinned})"),
+                Err(e) => assert_eq!(
+                    e.code(),
+                    pinned,
+                    "{id}: rejected with {:?}, the vector pins {pinned:?}",
+                    e.code()
+                ),
+            }
         }
     }
     assert!(

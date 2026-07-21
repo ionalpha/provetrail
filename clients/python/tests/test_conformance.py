@@ -26,13 +26,16 @@ pytestmark = pytest.mark.skipif(
 if CRYPTO_DIR.exists():
     MANIFEST = json.loads((CRYPTO_DIR / "manifest.json").read_text(encoding="utf-8"))
     SCOPE = json.loads(SCOPE_PATH.read_text(encoding="utf-8"))
-    # The root key comes from the manifest keyring, never pasted in here: a rotated
-    # conformance key must not leave a stale copy behind that still passes.
-    ROOT_KEY = bytes.fromhex(MANIFEST["keyring"][0]["public_key_hex"])
+    # The keyring comes from the manifest, never pasted in here: a rotated
+    # conformance key must not leave a stale copy behind that still passes. Keyed
+    # by key id, so sign.unknown_key is a reachable verdict.
+    KEYRING = {
+        k["key_id"]: bytes.fromhex(k["public_key_hex"]) for k in MANIFEST["keyring"]
+    }
     VECTORS = MANIFEST["vectors"]
     SUPPORTED = [v for v in VECTORS if v["kind"] in SCOPE["kinds_supported"]]
 else:  # pragma: no cover - the whole module is skipped in this case
-    MANIFEST, SCOPE, ROOT_KEY, VECTORS, SUPPORTED = None, None, b"", [], []
+    MANIFEST, SCOPE, KEYRING, VECTORS, SUPPORTED = None, None, {}, [], []
 
 
 def _is_out_of_scope(vector):
@@ -62,7 +65,13 @@ def test_the_published_suite_agrees_with_the_verifier(vector):
     # tier, so this client must accept it: rejecting would claim a tier it does
     # not implement.
     if vector["expect"] == "accept" or _is_out_of_scope(vector):
-        assert len(verify_run(record, ROOT_KEY).events) >= 1
+        assert len(verify_run(record, KEYRING).events) >= 1
     else:
-        with pytest.raises(VerifyError):
-            verify_run(record, ROOT_KEY)
+        with pytest.raises(VerifyError) as exc_info:
+            verify_run(record, KEYRING)
+        # Not just any rejection: the registered code the vector pins. A wrong
+        # code means the client rejected for the wrong reason.
+        assert exc_info.value.code == vector["failure_code"], (
+            f"{vector['id']}: rejected with {exc_info.value.code!r}, "
+            f"the vector pins {vector['failure_code']!r}"
+        )
