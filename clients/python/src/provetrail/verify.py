@@ -21,6 +21,11 @@ _LEAF_DOMAIN = b"provetrail/event/v1\n"
 # CBOR tag for a COSE_Sign1 message (RFC 9052).
 _COSE_SIGN1_TAG = 18
 
+# The pinned protected-header constants: Ed25519 as COSE algorithm -19 (RFC 9864)
+# and the vendor-tree checkpoint media type. Any other claim is a substitution.
+_CHECKPOINT_ALG = -19
+_CHECKPOINT_CONTENT_TYPE = "application/vnd.provetrail.checkpoint+cbor"
+
 
 class VerifyError(Exception):
     """A record failed verification. The message names the failed check."""
@@ -61,7 +66,17 @@ def verify_run(record: bytes, public_key: bytes) -> Verified:
     events = rec["events"]
     if not isinstance(checkpoint, (bytes, bytearray)) or not isinstance(events, list):
         raise VerifyError("record has the wrong field types")
+    if any(not isinstance(e, bytes) for e in events):
+        raise VerifyError("record events must be byte strings")
+    # Beyond key order, the bytes must be the exact canonical encoding of what they
+    # decode to: this rejects indefinite-length framing, non-minimal heads,
+    # duplicated keys (the decode silently keeps one), and trailing bytes, which a
+    # lenient decode would otherwise absorb.
+    if cbor2.dumps(rec, canonical=True) != bytes(record):
+        raise VerifyError("record container is not in canonical form")
     events = [bytes(e) for e in events]
+    if not events:
+        raise VerifyError("record carries no events")
 
     size, root = _verify_checkpoint(bytes(checkpoint), public_key)
 
@@ -90,6 +105,20 @@ def _verify_checkpoint(cose_bytes: bytes, public_key: bytes) -> tuple[int, bytes
     protected = bytes(protected)
     payload = bytes(payload)
     signature = bytes(signature)
+
+    # The protected header is covered by the signature, but its claims must still
+    # be OUR claims: the pinned algorithm and content type. A verifier that skips
+    # this accepts an algorithm or type substitution.
+    try:
+        header = cbor2.loads(protected)
+    except Exception as exc:  # noqa: BLE001
+        raise VerifyError(f"decode protected header: {exc}") from exc
+    if not isinstance(header, dict):
+        raise VerifyError("protected header is not a map")
+    if header.get(3) != _CHECKPOINT_CONTENT_TYPE:
+        raise VerifyError("unexpected checkpoint content type")
+    if header.get(1) != _CHECKPOINT_ALG:
+        raise VerifyError("unexpected checkpoint algorithm")
 
     # The signed bytes are the COSE_Sign1 Sig_structure (RFC 9052 section 4.4),
     # with an empty external_aad. The protected header is carried verbatim.

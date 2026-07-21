@@ -14,6 +14,10 @@ use sha2::{Digest, Sha256};
 /// The domain tag mixed into each event's hashed preimage, matching the standard.
 const LEAF_DOMAIN: &[u8] = b"provetrail/event/v1\n";
 
+/// The pinned checkpoint media type; together with COSE algorithm -19 (Ed25519,
+/// RFC 9864) these are the only protected-header claims a checkpoint may carry.
+const CHECKPOINT_CONTENT_TYPE: &str = "application/vnd.provetrail.checkpoint+cbor";
+
 #[derive(Deserialize)]
 struct Checkpoint {
     #[allow(dead_code)]
@@ -37,6 +41,8 @@ pub enum VerifyError {
     SizeMismatch,
     /// The events do not reproduce the signed root.
     RootMismatch,
+    /// The record carries no events.
+    Empty,
 }
 
 impl std::fmt::Display for VerifyError {
@@ -47,6 +53,7 @@ impl std::fmt::Display for VerifyError {
             VerifyError::Signature => write!(f, "signature did not verify"),
             VerifyError::SizeMismatch => write!(f, "event count does not match the signed size"),
             VerifyError::RootMismatch => write!(f, "events do not reproduce the signed root"),
+            VerifyError::Empty => write!(f, "record carries no events"),
         }
     }
 }
@@ -64,9 +71,25 @@ pub struct Verified {
 pub fn verify_run(record: &[u8], public_key: &[u8; 32]) -> Result<Verified, VerifyError> {
     let (checkpoint, carried) = decode_container(record)?;
 
+    if carried.is_empty() {
+        return Err(VerifyError::Empty);
+    }
+
     // The checkpoint is a tagged COSE_Sign1 (CBOR tag 18).
     let sign1 = coset::CoseSign1::from_tagged_slice(&checkpoint)
         .map_err(|e| VerifyError::Decode(format!("checkpoint: {e}")))?;
+    // The protected header is covered by the signature, but its claims must still
+    // be OUR claims: the pinned algorithm and content type. A verifier that skips
+    // this accepts an algorithm or type substitution.
+    match &sign1.protected.header.content_type {
+        Some(coset::ContentType::Text(t)) if t == CHECKPOINT_CONTENT_TYPE => {}
+        _ => return Err(VerifyError::Decode("unexpected checkpoint content type".into())),
+    }
+    if sign1.protected.header.alg
+        != Some(coset::Algorithm::Assigned(coset::iana::Algorithm::Ed25519))
+    {
+        return Err(VerifyError::Decode("unexpected checkpoint algorithm".into()));
+    }
     let vk = VerifyingKey::from_bytes(public_key).map_err(|_| VerifyError::Signature)?;
     sign1
         .verify_signature(b"", |sig, tbs| {
@@ -104,6 +127,15 @@ fn decode_container(record: &[u8]) -> Result<(Vec<u8>, Vec<Vec<u8>>), VerifyErro
 
     let value: Value =
         ciborium::from_reader(record).map_err(|e| VerifyError::Decode(e.to_string()))?;
+    // Beyond key order, the bytes must be the exact canonical encoding of what
+    // they decode to: this rejects indefinite-length framing, non-minimal heads,
+    // and trailing bytes, which a lenient decode would otherwise absorb.
+    let mut reencoded = Vec::with_capacity(record.len());
+    ciborium::into_writer(&value, &mut reencoded)
+        .map_err(|e| VerifyError::Decode(e.to_string()))?;
+    if reencoded != record {
+        return Err(VerifyError::NonCanonical);
+    }
     let Value::Map(entries) = value else {
         return Err(VerifyError::Decode("record is not a map".into()));
     };

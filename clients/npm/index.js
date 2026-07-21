@@ -19,6 +19,11 @@ const LEAF_DOMAIN = Buffer.from("provetrail/event/v1\n", "utf8");
 // CBOR tag for a COSE_Sign1 message (RFC 9052).
 const COSE_SIGN1_TAG = 18;
 
+// The pinned protected-header constants: Ed25519 as COSE algorithm -19 (RFC 9864)
+// and the vendor-tree checkpoint media type. Any other claim is a substitution.
+const CHECKPOINT_ALG = -19;
+const CHECKPOINT_CONTENT_TYPE = "application/vnd.provetrail.checkpoint+cbor";
+
 // DER SubjectPublicKeyInfo prefix for a raw Ed25519 public key.
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 
@@ -67,6 +72,25 @@ export function verifyRun(record, publicKey) {
   if (!(checkpoint instanceof Uint8Array) || !Array.isArray(events)) {
     throw new VerifyError("record has the wrong field types");
   }
+  if (events.some((e) => !(e instanceof Uint8Array))) {
+    throw new VerifyError("record events must be byte strings");
+  }
+  // Beyond key order, the bytes must be the exact canonical encoding of what they
+  // decode to: this rejects indefinite-length framing, non-minimal heads,
+  // duplicated keys (the decode silently keeps one), and trailing bytes, which a
+  // lenient decode would otherwise absorb. Byte fields are normalized to plain
+  // Uint8Array first: cbor2 serializes a Node Buffer through its toJSON form, not
+  // as a byte string.
+  const normalized = {
+    events: events.map((e) => Uint8Array.from(e)),
+    checkpoint: Uint8Array.from(checkpoint),
+  };
+  if (!Buffer.from(encode(normalized)).equals(Buffer.from(record))) {
+    throw new VerifyError("record container is not in canonical form");
+  }
+  if (events.length === 0) {
+    throw new VerifyError("record carries no events");
+  }
   const eventBytes = events.map((e) => Uint8Array.from(e));
 
   const { size, root } = verifyCheckpoint(checkpoint, publicKey);
@@ -95,6 +119,25 @@ function verifyCheckpoint(coseBytes, publicKey) {
   const [protectedHeader, , payload, signature] = tag.contents;
   if (payload == null) {
     throw new VerifyError("checkpoint has no payload");
+  }
+
+  // The protected header is covered by the signature, but its claims must still
+  // be OUR claims: the pinned algorithm and content type. A verifier that skips
+  // this accepts an algorithm or type substitution.
+  let header;
+  try {
+    header = decode(Uint8Array.from(protectedHeader));
+  } catch (e) {
+    throw new VerifyError(`decode protected header: ${e.message}`);
+  }
+  if (!(header instanceof Map)) {
+    throw new VerifyError("protected header is not a map");
+  }
+  if (header.get(3) !== CHECKPOINT_CONTENT_TYPE) {
+    throw new VerifyError("unexpected checkpoint content type");
+  }
+  if (header.get(1) !== CHECKPOINT_ALG) {
+    throw new VerifyError("unexpected checkpoint algorithm");
   }
 
   // The signed bytes are the COSE_Sign1 Sig_structure (RFC 9052 section 4.4),

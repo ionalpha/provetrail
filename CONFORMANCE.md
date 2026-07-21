@@ -73,13 +73,18 @@ This section lists the valid vectors actually published in [`vectors/`](./vector
 
 **Structural (L1)**, in `vectors/structural/`:
 
-- `valid.minimal.01` - a single event carrying only the seven REQUIRED envelope fields.
+- `valid.minimal.01` - a single event carrying only the seven REQUIRED envelope fields and an empty payload map.
 - `valid.optional_fields.01` - an event carrying the OPTIONAL fields (`causation_id`, `principal`, `origin_instance_id`, `trace_id`, `span_id`), pinning the omit-when-empty rule and the bytes their presence produces.
 - `valid.chain.01` - N ordered events in one stream with strictly increasing `seq`.
+- `valid.seq_gap.01` - events with `seq` 1, 5, 900: a record may carry a window of a longer stream, so gaps are permitted (specification Section 2.1).
+- `valid.large_ints.01` - `seq` and `time` beyond 2^53 (2^53+1 and the int64 maximum): a verifier that coerces int64 through a 53-bit float representation corrupts these values and fails.
+- `valid.unicode_payload.01` - payload keys spanning one to four UTF-8 bytes, pinning bytewise-encoded key sort order and non-ASCII content.
+- `valid.payload_bytes.01` - a payload carrying a CBOR byte string value: binary data is a bstr, exempt from the UTF-8 rule for text strings.
 
 **Cryptographic and above (L2-L4)**, in `vectors/crypto/`:
 
 - `crypto.checkpoint.valid.01` (L2) - a COSE-signed checkpoint that verifies under the published test key.
+- `crypto.checkpoint.empty_tree.01` (L2) - a signed checkpoint over an empty tree, pinning the RFC 6962 empty-tree root (SHA-256 of the empty string).
 - `crypto.run.valid.01` (L2) - a sealed run whose carried events reproduce the signed Merkle root.
 - `crypto.event_proof.valid.01` (L3) - an RFC 9162 inclusion proof reconstructing a signed root.
 - `crypto.consistency.valid.01` (L3) - a consistency proof between two signed roots.
@@ -93,11 +98,13 @@ Not yet published, and therefore NOT part of conformance at this version: multi-
 ## 5. Invalid vectors (MUST reject, one defect each)
 
 ### Encoding / canonicalization (L1)
-- `enc.non_canonical_cbor` - valid CBOR that violates the deterministic profile (for example unsorted map keys, non-minimal integer encoding).
-- `enc.duplicate_map_key` - duplicate map keys.
-- `enc.indefinite_length` - indefinite-length items, disallowed by the deterministic profile.
+- `enc.non_canonical_cbor` - valid CBOR that is not the canonical encoding of the event it decodes to: unsorted map keys, non-minimal integer or length encoding, a missing required field, or an unknown extra field. The canonical-form check subsumes envelope-schema validity: any well-formed deviation from the exact canonical envelope is, by construction, not the canonical encoding of any event.
+- `enc.duplicate_map_key` - duplicate map keys (pinned on both a fragment and a full envelope).
+- `enc.indefinite_length` - indefinite-length items, disallowed by the deterministic profile (pinned on both a fragment and a full envelope).
 - `enc.trailing_bytes` - extra bytes after a complete encoding.
 - `enc.invalid_utf8` - a text string that is not valid UTF-8.
+- `enc.decode` - bytes that do not decode as an event at all, for example a required field carrying the wrong CBOR type.
+- `enc.invalid_actor` - an `actor` outside the closed category `agent`, `human`, `system` (specification Section 2.1).
 
 ### Ordering / structure (L1)
 - `chain.non_monotonic_seq` - `seq` decreases or repeats within a stream.
@@ -105,19 +112,23 @@ Not yet published, and therefore NOT part of conformance at this version: multi-
 - `chain.empty` - an empty event stream.
 
 ### Signature (L2)
-- `sign.signature_invalid` - the signature does not verify under the named key.
-- `sign.unknown_key` - signed by a key not in the verifier's keyring.
-- `sign.bad_content_type` - the signed content type is not the expected one (guards algorithm and type substitution).
-- `sign.checkpoint_decode` - the signed payload does not decode as a checkpoint.
+- `sign.signature_invalid` - the signature does not verify under the named key, including a substituted algorithm identifier (an ES256 claim over an Ed25519 signature is pinned by vector).
+- `sign.unknown_key` - signed by a key not in the verifier's keyring (pinned at both checkpoint and run kind).
+- `sign.bad_content_type` - the signed content type is missing or is not the checkpoint type (both pinned by vector).
+- `sign.checkpoint_decode` - the signed payload is not the canonical encoding of a checkpoint: it does not decode, has a missing or extra field, non-canonical key order, or a root that is not a SHA-256 digest (each pinned by vector).
 
 ### Record integrity (L2)
+- `record.decode` - the record container does not decode: a duplicated container key, indefinite-length framing, trailing bytes, or events that are not byte strings (each pinned by vector).
+- `record.empty` - the record carries no events, even under a validly signed size-0 checkpoint.
 - `record.root_mismatch` - the events do not reproduce the signed root.
 - `record.size_mismatch` - the event count does not match the signed size.
-- `record.non_canonical` - the record container is not in canonical form.
+- `record.non_canonical` - the record container decodes but is not in canonical form (for example a non-minimal map length head).
 
 ### Transparency (L3)
 - `merkle.inclusion_invalid` - an inclusion path does not reconstruct the signed root.
 - `merkle.consistency_invalid` - a consistency proof between two roots does not hold (append-only violated).
+- `merkle.missing_node` - an inclusion path shorter than the tree shape requires.
+- `record.index_out_of_range` - a proof index outside the signed tree size.
 
 ### Governance (L4)
 - `gov.unadmitted_action` - a side-effecting action that completed with no preceding admission record.
@@ -153,13 +164,8 @@ Section 5 lists the codes a **vector** pins. The registry is wider than that, be
 
 | Code | Meaning |
 |---|---|
-| `enc.decode` | The bytes do not decode as an event under the deterministic profile. |
 | `enc.encode` | The logical event cannot be canonically encoded (for example a non-UTF-8 string field). |
 | `enc.time_out_of_range` | The event time is absent or outside the representable range. |
-| `record.decode` | The record container does not decode. |
-| `record.empty` | The record carries no events. |
-| `record.index_out_of_range` | A proof references an event index the record does not contain. |
-| `merkle.missing_node` | A proof path is missing a node required to reconstruct the root. |
 
 **Producer-side.** Emitted when producing a record, never by a verifier examining one. Registered for reporting symmetry: `sign.empty_key_id`, `sign.bad_key`, `sign.sign_failed`.
 
