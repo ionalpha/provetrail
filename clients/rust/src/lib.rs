@@ -8,7 +8,6 @@
 
 use coset::TaggedCborSerializable;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 /// The domain tag mixed into each event's hashed preimage, matching the standard.
@@ -17,15 +16,6 @@ const LEAF_DOMAIN: &[u8] = b"provetrail/event/v1\n";
 /// The pinned checkpoint media type; together with COSE algorithm -19 (Ed25519,
 /// RFC 9864) these are the only protected-header claims a checkpoint may carry.
 const CHECKPOINT_CONTENT_TYPE: &str = "application/vnd.provetrail.checkpoint+cbor";
-
-#[derive(Deserialize)]
-struct Checkpoint {
-    #[allow(dead_code)]
-    origin: String,
-    size: u64,
-    #[serde(with = "serde_bytes")]
-    root: Vec<u8>,
-}
 
 /// Why a record failed verification. [`VerifyError::code`] gives the registered
 /// failure code (CONFORMANCE.md section 6 / registry.json) for each variant.
@@ -172,18 +162,67 @@ fn verify_run_inner(record: &[u8], keys: Keys<'_>) -> Result<Verified, VerifyErr
         .map_err(|_| VerifyError::Signature)?;
 
     let payload = sign1.payload.ok_or(VerifyError::Signature)?;
-    let cp: Checkpoint = ciborium::from_reader(payload.as_slice())
-        .map_err(|e| VerifyError::CheckpointDecode(e.to_string()))?;
+    let (size, root) = decode_checkpoint_payload(&payload)?;
 
     let events = carried;
-    if events.len() as u64 != cp.size {
+    if events.len() as u64 != size {
         return Err(VerifyError::SizeMismatch);
     }
     let leaves: Vec<[u8; 32]> = events.iter().map(|e| leaf_hash(e)).collect();
-    if merkle_root(&leaves).as_slice() != cp.root.as_slice() {
+    if merkle_root(&leaves).as_slice() != root.as_slice() {
         return Err(VerifyError::RootMismatch);
     }
     Ok(Verified { events })
+}
+
+/// Decode the signed checkpoint payload strictly: the exact canonical encoding of
+/// the closed map {root, size, origin}. A missing or extra field, non-canonical
+/// key order, a float size, or a root that is not a SHA-256 digest is rejected
+/// rather than absorbed into a default.
+fn decode_checkpoint_payload(payload: &[u8]) -> Result<(u64, Vec<u8>), VerifyError> {
+    use ciborium::value::Value;
+
+    let value: Value =
+        ciborium::from_reader(payload).map_err(|e| VerifyError::CheckpointDecode(e.to_string()))?;
+    let mut reencoded = Vec::with_capacity(payload.len());
+    ciborium::into_writer(&value, &mut reencoded)
+        .map_err(|e| VerifyError::CheckpointDecode(e.to_string()))?;
+    if reencoded != payload {
+        return Err(VerifyError::CheckpointDecode(
+            "checkpoint payload is not in canonical form".into(),
+        ));
+    }
+    let Value::Map(entries) = value else {
+        return Err(VerifyError::CheckpointDecode(
+            "checkpoint payload is not a map".into(),
+        ));
+    };
+    let keys: Vec<Option<&str>> = entries.iter().map(|(k, _)| k.as_text()).collect();
+    if keys != [Some("root"), Some("size"), Some("origin")] {
+        return Err(VerifyError::CheckpointDecode(
+            "checkpoint payload is not the closed {root, size, origin} map".into(),
+        ));
+    }
+    let root = entries[0]
+        .1
+        .as_bytes()
+        .ok_or_else(|| VerifyError::CheckpointDecode("root is not a byte string".into()))?
+        .clone();
+    if root.len() != 32 {
+        return Err(VerifyError::CheckpointDecode(
+            "checkpoint root is not a SHA-256 digest".into(),
+        ));
+    }
+    let size: u64 = entries[1]
+        .1
+        .as_integer()
+        .and_then(|i| u64::try_from(i).ok())
+        .ok_or_else(|| VerifyError::CheckpointDecode("size is not an unsigned integer".into()))?;
+    entries[2]
+        .1
+        .as_text()
+        .ok_or_else(|| VerifyError::CheckpointDecode("origin is not a text string".into()))?;
+    Ok((size, root))
 }
 
 /// Decode the record container into its checkpoint and carried event bytes.

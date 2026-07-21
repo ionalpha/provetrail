@@ -128,7 +128,8 @@ export function verifyRun(record, publicKey) {
 
   const { size, root } = verifyCheckpoint(checkpoint, publicKey, keyring);
 
-  if (eventBytes.length !== size) {
+  // BigInt-safe: a size beyond 2^53 must not silently lose precision.
+  if (BigInt(eventBytes.length) !== BigInt(size)) {
     throw new VerifyError("record.size_mismatch", "event count does not match the signed size");
   }
   const leaves = eventBytes.map(leafHash);
@@ -223,12 +224,29 @@ function verifyCheckpoint(coseBytes, publicKey, keyring) {
   } catch (e) {
     throw new VerifyError("sign.checkpoint_decode", `decode checkpoint payload: ${e.message}`);
   }
-  if (cp === null || typeof cp !== "object" || !("size" in cp) || !("root" in cp)) {
-    throw new VerifyError("sign.checkpoint_decode", "checkpoint payload is not a valid checkpoint");
+  // The payload must be the exact canonical encoding of the closed checkpoint
+  // map {root, size, origin}: a missing or extra field, non-canonical key order,
+  // a float size (indistinguishable from an int by value in JS, so caught by the
+  // re-encoding comparison), or a root that is not a SHA-256 digest is rejected.
+  const cpKeys = cp !== null && typeof cp === "object" ? Object.keys(cp) : [];
+  if (cpKeys.length !== 3 || cpKeys[0] !== "root" || cpKeys[1] !== "size" || cpKeys[2] !== "origin") {
+    throw new VerifyError(
+      "sign.checkpoint_decode",
+      "checkpoint payload is not the closed {root, size, origin} map",
+    );
   }
-  const size = typeof cp.size === "bigint" ? Number(cp.size) : cp.size;
-  if (!Number.isInteger(size) || !(cp.root instanceof Uint8Array)) {
+  const size = cp.size;
+  const sizeOk =
+    typeof size === "bigint" ? size >= 0n : typeof size === "number" && Number.isInteger(size) && size >= 0;
+  if (!sizeOk || !(cp.root instanceof Uint8Array) || typeof cp.origin !== "string") {
     throw new VerifyError("sign.checkpoint_decode", "checkpoint has the wrong field types");
+  }
+  if (cp.root.length !== 32) {
+    throw new VerifyError("sign.checkpoint_decode", "checkpoint root is not a SHA-256 digest");
+  }
+  const normalizedCp = { root: Uint8Array.from(cp.root), size, origin: cp.origin };
+  if (!Buffer.from(encode(normalizedCp)).equals(Buffer.from(payload))) {
+    throw new VerifyError("sign.checkpoint_decode", "checkpoint payload is not in canonical form");
   }
   return { size, root: cp.root };
 }

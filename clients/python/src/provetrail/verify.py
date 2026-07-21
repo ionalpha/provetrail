@@ -185,13 +185,26 @@ def _verify_checkpoint(cose_bytes: bytes, public_key, keyring) -> tuple[int, byt
         cp = cbor2.loads(payload)
     except Exception as exc:  # noqa: BLE001
         raise VerifyError("sign.checkpoint_decode", f"decode checkpoint payload: {exc}") from exc
-    if not isinstance(cp, dict) or "size" not in cp or "root" not in cp:
-        raise VerifyError("sign.checkpoint_decode", "checkpoint payload is not a valid checkpoint")
-    size = cp["size"]
-    root = cp["root"]
-    if not isinstance(size, int) or not isinstance(root, (bytes, bytearray)):
+    # The payload must be the exact canonical encoding of the closed checkpoint
+    # map {root, size, origin}: a missing or extra field, non-canonical key order,
+    # a float size, or a root that is not a SHA-256 digest is rejected rather than
+    # absorbed into a default.
+    if not isinstance(cp, dict) or list(cp) != ["root", "size", "origin"]:
+        raise VerifyError("sign.checkpoint_decode", "checkpoint payload is not the closed {root, size, origin} map")
+    root, size, origin = cp["root"], cp["size"], cp["origin"]
+    if (
+        not isinstance(root, bytes)
+        or not isinstance(size, int)
+        or isinstance(size, bool)
+        or size < 0
+        or not isinstance(origin, str)
+    ):
         raise VerifyError("sign.checkpoint_decode", "checkpoint has the wrong field types")
-    return size, bytes(root)
+    if len(root) != 32:
+        raise VerifyError("sign.checkpoint_decode", "checkpoint root is not a SHA-256 digest")
+    if cbor2.dumps(cp, canonical=True) != payload:
+        raise VerifyError("sign.checkpoint_decode", "checkpoint payload is not in canonical form")
+    return size, root
 
 
 def _leaf_hash(canonical: bytes) -> bytes:

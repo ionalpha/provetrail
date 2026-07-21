@@ -1,6 +1,6 @@
 {
   "name": "provetrail",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Verifier for the Provetrail standard (verifiable execution provenance): checks a sealed run record's signature and Merkle integrity.",
   "keywords": [
     "provetrail",
