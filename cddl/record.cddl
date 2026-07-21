@@ -1,0 +1,14 @@
+; Provetrail sealed run record, v0.1 (SPEC.md Section 8).
+;
+; The portable record: every event's canonical bytes plus the signed checkpoint
+; over the Merkle head they rebuild. The container is closed: exactly these two
+; fields, and a record MUST carry at least one event (record.empty).
+
+sealed-run = {
+  events: [ + event-bytes ],
+  checkpoint: bstr .cbor signed-checkpoint,
+}
+
+; Each entry is the canonical encoding of one event (envelope.cddl); a verifier
+; rehashes these exact bytes and never re-serializes.
+event-bytes = bstr .cbor event

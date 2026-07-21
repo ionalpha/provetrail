@@ -1,0 +1,38 @@
+; Provetrail event envelope, v0.1 (SPEC.md Section 8).
+;
+; CDDL cannot express encoding-level rules, so this schema is necessarily the
+; weaker half of the contract: the deterministic-encoding profile (definite
+; lengths only, shortest heads, bytewise-sorted keys on their encoded form) and
+; the canonical re-derivation check are normative in SPEC.md and are what the
+; invalid vectors exercise. A structure valid here can still be rejected there.
+
+; Member notes:
+;   actor          - the closed producer category; anything else is rejected
+;                    (enc.invalid_actor).
+;   seq            - int64, >= 1 (bound normative in SPEC.md), strictly
+;                    increasing within a stream, gaps permitted.
+;   time           - Unix nanoseconds UTC, int64. Advisory; ordering is by seq.
+event = {
+  actor: "agent" / "human" / "system",
+  ? causation_id: tstr,
+  ? origin_instance_id: tstr,
+  payload: { * tstr => payload-value },
+  ? principal: tstr,
+  schema_version: int,
+  seq: uint,
+  ? span_id: tstr,
+  stream: tstr,
+  "time": int,
+  ? trace_id: tstr,
+  type: tstr,
+}
+
+; The payload value model: the I-JSON-compatible subset plus byte strings.
+; Floating-point values and CBOR tags are prohibited at this version.
+payload-value = tstr
+              / bstr
+              / int
+              / bool
+              / nil
+              / [ * payload-value ]
+              / { * tstr => payload-value }

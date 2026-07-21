@@ -1,0 +1,20 @@
+; Provetrail proof artifacts, v0.1 (SPEC.md Section 8).
+;
+; An event proof carries one event's canonical bytes, its position, the
+; inclusion path to the signed root, and the signed checkpoint itself, so a
+; single action is verifiable without the rest of the run. A consistency proof
+; connects two signed checkpoints of the same growing log.
+
+event-proof = {
+  canonical: event-bytes,
+  checkpoint: bstr .cbor signed-checkpoint,
+  inclusion: [ * bstr .size 32 ],
+  index: uint,
+  size: uint,
+}
+
+consistency-proof = {
+  after: bstr .cbor signed-checkpoint,
+  before: bstr .cbor signed-checkpoint,
+  proof: [ * bstr .size 32 ],
+}

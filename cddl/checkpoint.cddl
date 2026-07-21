@@ -1,0 +1,32 @@
+; Provetrail signed checkpoint, v0.1 (SPEC.md Section 8).
+;
+; A checkpoint is a COSE_Sign1 (RFC 9052), tag 18 REQUIRED, over the canonical
+; encoding of the checkpoint payload. The protected header is exactly the three
+; pinned claims; the unprotected header MUST be empty.
+
+signed-checkpoint = #6.18(cose-sign1)
+
+cose-sign1 = [
+  protected: bstr .cbor protected-header,
+  unprotected: {},
+  payload: bstr .cbor checkpoint-payload,
+  signature: bstr .size 64,
+]
+
+; 1 (alg): Ed25519, COSE algorithm -19 (RFC 9864). The deprecated -8 (EdDSA)
+;   MUST NOT be produced and MUST be rejected.
+; 3 (content type): the vendor-tree checkpoint media type.
+; 4 (kid): the signing key's identifier in the verifier's keyring.
+protected-header = {
+  1 => -19,
+  3 => "application/vnd.provetrail.checkpoint+cbor",
+  4 => bstr,
+}
+
+; The signed payload: the Merkle head over a log's leaves, scoped to the origin
+; that names the log. All three fields REQUIRED; extra fields rejected.
+checkpoint-payload = {
+  origin: tstr,
+  root: bstr .size 32,
+  size: uint,
+}

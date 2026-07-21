@@ -96,7 +96,7 @@ The canonical encoding is **deterministic CBOR** as defined by RFC 8949 Section 
 - Bytes trailing a complete encoding MUST be rejected.
 - A text string that is not valid UTF-8 MUST be rejected.
 
-Core Deterministic Encoding already requires that map keys are sorted bytewise, that integers use their shortest form, and that floats use the shortest form that round-trips. The tightenings above close the remaining ambiguities that would let two distinct byte strings claim to be the same event. This profile is compatible with the direction of the CBOR Common Deterministic Encoding (CDE) work, which is tracked as informative; the normative reference is RFC 8949 Section 4.2 plus the four rules above, because that is what an implementation can conform to today.
+Core Deterministic Encoding already requires that map keys are sorted bytewise, that integers use their shortest form, and that floats use the shortest form that round-trips. The tightenings above close the remaining ambiguities that would let two distinct byte strings claim to be the same event. This profile is compatible with the direction of the CBOR Common Deterministic Encoding (CDE) work (`draft-ietf-cbor-cde-13`, parked and expired as of 2026; informative only); the normative reference is RFC 8949 Section 4.2.1 plus the four rules above, because that is what an implementation can conform to today. Section 8.1 completes the profile normatively.
 
 Rationale for CBOR over canonical JSON:
 
@@ -113,7 +113,7 @@ Provetrail assembles existing standards. It does not invent cryptography.
 
 ### 4.1 Event commitment
 
-Each event's canonical bytes are committed as a leaf in the append-only Merkle log of Section 4.3. The leaf preimage is domain-separated and length-framed (the leaf is the hash of a fixed domain tag, the canonical byte length, and the canonical bytes), so two different events can never share a preimage. The hash function is SHA-256 (RFC 6962 leaf hashing) unless a later profile specifies otherwise. The signed root over these leaves, not a per-event back-pointer, is the tamper-evidence: altering, reordering, dropping, or inserting any event no longer reproduces the signed root.
+Each event's canonical bytes are committed as a leaf in the append-only Merkle log of Section 4.3. The tree is an RFC 6962 / RFC 9162 SHA-256 Merkle tree whose *entry* is the domain-separated, length-framed preimage of the event's canonical bytes — the exact construction, with every constant, is Section 8.3. Domain separation and length framing mean two different events can never share a preimage, and because they live inside the entry the tree matches the `RFC9162_SHA256` verifiable data structure, unlocking RFC 9942 COSE Receipt interoperability. The signed root over these leaves, not a per-event back-pointer, is the tamper-evidence: altering, reordering, dropping, or inserting any event no longer reproduces the signed root.
 
 ### 4.2 Signing
 
@@ -176,15 +176,114 @@ Adoption strategy is by composition: a Provetrail record references the identiti
 
 ---
 
+## 8. Wire format (normative)
+
+This section pins every constant a verifier needs, so an independent implementation can be built from this document alone, without reading the reference implementation or the client verifiers. The conformance vectors embody exactly these rules; machine-readable CDDL for each structure is published in [`cddl/`](./cddl/) and validated against the vectors in CI. Where CDDL cannot express a rule (encoding-level constraints, canonical form), the text here is normative.
+
+### 8.1 Deterministic-encoding profile
+
+Every hashed or signed structure is encoded as **deterministic CBOR**: RFC 8949 Section 4.2.1 (Core Deterministic Encoding Requirements), which requires shortest-form integer and length heads, definite lengths only, and map keys sorted bytewise on their *encoded* form. A conforming decoder MUST additionally enforce the four tightenings of Section 3.2: reject duplicate map keys, indefinite-length items, trailing bytes, and invalid UTF-8. For completeness of the profile: there is no integer/float unification (an integral value encoded as a float is a different value), and since floating-point values do not occur in any structure at this version, no float canonicalization rule is exercised; if a future version admits floats, it must state one. The parked CBOR Common Deterministic Encoding draft (`draft-ietf-cbor-cde-13`) is compatible in direction and cited informatively only.
+
+The load-bearing consequence: for any structure in this section, decoding and canonically re-encoding MUST reproduce the input bytes exactly. A verifier that performs this re-derivation check enforces the whole profile at once; the `enc.non_canonical_cbor` and `record.non_canonical` codes name its failures.
+
+### 8.2 Event envelope
+
+An event is a CBOR map with text-string keys. Seven fields are REQUIRED, five are OPTIONAL with the omit-when-empty rule of Section 2.1. In canonical (bytewise) key order over the minimal envelope: `actor`, `payload`, `schema_version`, `seq`, `stream`, `time`, `type`; the optional fields `causation_id`, `origin_instance_id`, `principal`, `span_id`, `trace_id` sort among them by the same rule when present.
+
+| Key | CBOR type | Constraint |
+|---|---|---|
+| `stream` | tstr | MAY be empty. |
+| `seq` | int (int64) | MUST be >= 1; strictly increasing between adjacent carried events; gaps permitted. |
+| `time` | int (int64) | Unix nanoseconds UTC. Advisory; any int64 value is well-formed on the wire. |
+| `type` | tstr | MAY be empty. |
+| `actor` | tstr | Closed category: exactly `agent`, `human`, or `system`. Any other value MUST be rejected (`enc.invalid_actor`). |
+| `payload` | map | tstr keys; value model below. Always present, possibly empty. |
+| `schema_version` | int | The payload schema version for this `type`. |
+
+An unknown envelope field MUST be rejected. This follows from the canonical-form rule — no canonical event encoding contains one — and the conformance suite pins it (`invalid.schema.unknown_field.01` rejects as `enc.non_canonical_cbor`). A required field whose value is the empty string is well-formed: required fields MUST be encoded even when empty (Section 2.1).
+
+**Payload value model.** A payload value is one of: tstr, bstr, int (int64 range), bool, null, an array of payload values, or a map with tstr keys and payload values. Floating-point values and CBOR tags MUST NOT be produced at this version; no published vector contains either. This is the I-JSON (RFC 7493) value model plus byte strings and full-int64 integers; in any JSON projection a bstr is represented as base64url (RFC 4648 Section 5, unpadded), and integers beyond 2^53 lose exactness, which is one reason a JSON projection is never hashed (Section 3.2).
+
+### 8.3 Merkle profile
+
+The log is an RFC 6962 / RFC 9162 Merkle tree over SHA-256 whose *entry* for each event is the domain-separated, length-framed preimage of the event's canonical bytes:
+
+```
+entry = "provetrail/event/v1\n" || uint64-BE(len(canonical)) || canonical
+leaf  = SHA-256(0x00 || entry)
+node  = SHA-256(0x01 || left || right)
+empty = SHA-256("")            ; the root of an empty tree
+```
+
+The domain tag is the 20-byte ASCII string `provetrail/event/v1\n` (terminating newline included); the length is an unsigned 64-bit big-endian integer counting the canonical bytes. Because the domain tag and length framing live *inside* the entry, the tree is byte-for-byte an RFC 6962-conformant tree over `entry`, and therefore matches the `RFC9162_SHA256` verifiable data structure (vds = 1) of the COSE Receipts registry: a record MAY carry an RFC 9942 COSE Receipt for a checkpoint, and an RFC 9162/9942-conformant proof verifier needs no Provetrail-specific tree code. Inclusion proofs follow RFC 9162 Section 2.1.3.1 and consistency proofs Section 2.1.4.1, over the leaf definition of Section 2.1.1 with the entry defined above.
+
+### 8.4 COSE profile
+
+A checkpoint signature is a **COSE_Sign1** (RFC 9052), and the CBOR tag 18 is REQUIRED on the wire. The protected header is exactly three claims — no more, no fewer:
+
+| Label | Value |
+|---|---|
+| 1 (alg) | **-19** (`Ed25519`, fully-specified, RFC 9864). The deprecated polymorphic `EdDSA` (-8) MUST NOT be produced and MUST be rejected. |
+| 3 (content type) | `application/vnd.provetrail.checkpoint+cbor` |
+| 4 (kid) | The signing key's identifier, as a byte string, resolved against the verifier's keyring. |
+
+The unprotected header MUST be empty (`{}`). The signature input is the `Sig_structure` of RFC 9052 Section 4.4 with context `"Signature1"` and a zero-length `external_aad` (`h''`). The COSE structure itself is encoded under the Section 8.1 profile. Multi-signature (`COSE_Sign`) is deferred to a future version. Algorithm agility: algorithms are registry-pinned per profile version — SHA-256 and Ed25519/-19 at v0.1 — and a future profile version can add, for example, ML-DSA (RFC 9964, -48/-49/-50) without changing this one.
+
+The checkpoint payload (the signed bytes) is a CBOR map, canonical key order `root`, `size`, `origin`:
+
+```
+checkpoint-payload = { root: bstr .size 32, size: uint, origin: tstr }
+```
+
+All three fields are REQUIRED — including `origin`, which scopes the root to the log that produced it. A payload that is not the exact canonical encoding of this map (missing or extra field, non-canonical key order, a root that is not 32 bytes) MUST be rejected (`sign.checkpoint_decode`).
+
+### 8.5 Record container
+
+A sealed run record is a CBOR map of exactly two fields, canonical key order `events`, `checkpoint`:
+
+```
+sealed-run = { events: [ + bstr ], checkpoint: bstr }
+```
+
+Each `events` entry is one event's canonical bytes; `checkpoint` is the tagged COSE_Sign1 of Section 8.4. The container is closed: an extra field, a duplicated key, indefinite-length framing, non-minimal heads, or trailing bytes MUST be rejected (`record.decode` / `record.non_canonical`). A record with zero events MUST be rejected (`record.empty`) even when its checkpoint validly signs size 0; the empty-tree root exists so that an empty *checkpoint* is verifiable (Section 8.3), but a *record* must attest at least one event. The event count MUST equal the signed `size` (`record.size_mismatch`) and the events MUST rebuild the signed `root` exactly (`record.root_mismatch`).
+
+### 8.6 Proof artifacts
+
+A standalone single-event proof is a CBOR map, canonical key order `size`, `index`, `canonical`, `inclusion`, `checkpoint`:
+
+```
+event-proof = { size: uint, index: uint, canonical: bstr,
+                inclusion: [ * bstr .size 32 ], checkpoint: bstr }
+```
+
+`index` is zero-based and MUST be less than `size` (`record.index_out_of_range`); `size` MUST equal the signed size (`record.size_mismatch`); an inclusion path shorter than the tree shape requires MUST be rejected (`merkle.missing_node`); the path MUST reconstruct the signed root per RFC 9162 Section 2.1.3.2 (`merkle.inclusion_invalid`).
+
+A consistency proof between two signed checkpoints of the same log is a CBOR map, canonical key order `after`, `proof`, `before`:
+
+```
+consistency-proof = { after: bstr, proof: [ * bstr .size 32 ], before: bstr }
+```
+
+`before` and `after` are each a tagged COSE_Sign1 checkpoint; `proof` is the RFC 9162 Section 2.1.4.2 consistency path from the `before` tree to the `after` tree (`merkle.consistency_invalid` on failure).
+
+---
+
 ## References
 
 - RFC 2119 / RFC 8174 - Requirement keywords
 - RFC 7493 - The I-JSON Message Format
-- RFC 8949 - Concise Binary Object Representation (CBOR); Section 4.2 Core Deterministic Encoding (normative for Section 3.2)
-- CBOR Common Deterministic Encoding (CDE) - `draft-ietf-cbor-cde` (informative)
+- RFC 4648 - Base16, Base32, and Base64 Data Encodings (base64url, for JSON projections of byte strings)
+- RFC 8949 - Concise Binary Object Representation (CBOR); Section 4.2.1 Core Deterministic Encoding Requirements (normative for Sections 3.2 and 8.1)
+- CBOR Common Deterministic Encoding (CDE) - `draft-ietf-cbor-cde-13` (informative; parked and expired as of 2026)
 - RFC 9052 - CBOR Object Signing and Encryption (COSE)
 - RFC 8032 - Edwards-Curve Digital Signature Algorithm (Ed25519)
-- RFC 9162 - Certificate Transparency Version 2.0
+- RFC 9864 - Fully-Specified Algorithms for JOSE and COSE (Ed25519 as COSE algorithm -19; deprecates -8)
+- RFC 6838 - Media Type Specifications and Registration Procedures (vendor tree, Section 3.1)
+- RFC 6962 - Certificate Transparency (the Merkle tree construction the entry profile of Section 8.3 conforms to)
+- RFC 9162 - Certificate Transparency Version 2.0 (Sections 2.1.1, 2.1.3.x, 2.1.4.x; normative for Section 8.3)
+- RFC 9942 - COSE Receipts (`RFC9162_SHA256`, vds = 1)
+- RFC 9943 - An Architecture for Trustworthy and Transparent Digital Supply Chains (SCITT)
+- RFC 9964 - ML-DSA for COSE (referenced by the algorithm-agility statement of Section 8.4)
 - RFC 8785 - JSON Canonicalization Scheme (referenced for the optional JSON profile and for the numeric-precision rationale)
-- in-toto attestation framework; IETF SCITT architecture (`draft-ietf-scitt-architecture`)
+- in-toto attestation framework
 - W3C Verifiable Credentials Data Model

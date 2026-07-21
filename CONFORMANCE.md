@@ -80,6 +80,7 @@ This section lists the valid vectors actually published in [`vectors/`](./vector
 - `valid.large_ints.01` - `seq` and `time` beyond 2^53 (2^53+1 and the int64 maximum): a verifier that coerces int64 through a 53-bit float representation corrupts these values and fails.
 - `valid.unicode_payload.01` - payload keys spanning one to four UTF-8 bytes, pinning bytewise-encoded key sort order and non-ASCII content.
 - `valid.payload_bytes.01` - a payload carrying a CBOR byte string value: binary data is a bstr, exempt from the UTF-8 rule for text strings.
+- `valid.empty_strings.01` - required string fields that are empty: required fields are encoded even when empty (specification Sections 2.1 and 8.2), as zero-length text strings.
 
 **Cryptographic and above (L2-L4)**, in `vectors/crypto/`:
 
