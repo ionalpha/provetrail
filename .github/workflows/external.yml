@@ -1,0 +1,54 @@
+name: External surfaces
+
+# Checks the things that live outside this repository and would otherwise break
+# silently: the reference implementation's copy of the vectors, the w3id permanent
+# identifier, provetrail.org, and the registries.
+#
+# Deliberately NOT part of the conformance gate. Every check here depends on another
+# repository or on the network, and neither should ever be able to block a pull request.
+# It runs on a schedule, on demand, and whenever the vectors themselves change.
+on:
+  schedule:
+    - cron: "17 9 * * 1" # Mondays, 09:17 UTC
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "vectors/**"
+      - "scripts/check_vector_drift.py"
+      - "scripts/check_external_surfaces.py"
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Vector drift against the reference implementation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the reference implementation
+        uses: actions/checkout@v4
+        with:
+          repository: ionalpha/flynn
+          path: .flynn
+          # The default token reaches a public repository. If flynn is private, add a
+          # read-only PAT as FLYNN_READ_TOKEN; without it this job fails loudly rather
+          # than skipping, because a silent skip is how drift goes unnoticed.
+          token: ${{ secrets.FLYNN_READ_TOKEN || github.token }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # CONFORMANCE.md Section 7: the vectors are generated there and published here.
+      # Two copies in two repositories, byte-identical only by hand until now.
+      - run: python scripts/check_vector_drift.py --flynn .flynn
+
+  surfaces:
+    name: Permanent identifier, site and registries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/check_external_surfaces.py

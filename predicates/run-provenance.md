@@ -32,7 +32,7 @@ The body references a run and binds it to its event stream:
 | `stream` | The event stream identifier (Section 2.1 of the spec). |
 | `head` | The stream head this statement attests to: the event count (`size`) the signed root covers. |
 | `root` | The signed Merkle root (RFC 9162) over the stream's events at `head`, the commitment any inclusion proof reconstructs. |
-| `actor` | The run's principal actor, as an external identity reference (`did`, verifiable credential, or agent-identity record). Provetrail references identity; it does not define it. |
+| `principal` | The identity on whose authority the run executed, as an external identity reference (`did`, verifiable credential, or agent-identity record). Provetrail references identity; it does not define it. Named to match the event field of the same meaning in Section 2.1 of the specification, where `actor` is the coarse category (`agent`, `human`, `system`) and `principal` is the identity-bearing field. |
 | `fold_digest` | A digest of the deterministic fold of the stream up to `head`, so a verifier can bind the attested final state to the events. |
 | `governance` | A summary of the admission and gate records present (Sections 2.2 and 2.3 of the spec), sufficient for an L4 verifier to check that no side-effecting action ran without admission. |
 | `schema_version` | The schema version of this statement body. |
@@ -42,7 +42,7 @@ The body references a run and binds it to its event stream:
 Per the conformance tiers:
 
 1. The carried event bytes rehash to leaves that reconstruct the signed Merkle `root` at the attested `head`.
-2. The COSE signature(s) verify under the key bound to `actor`.
+2. The COSE signature(s) verify under the key bound to `principal`.
 3. If `root` is present, the inclusion proof reconstructs the signed root (L3).
 4. `fold_digest` matches the verifier's own re-fold of the carried events (binds the claim to what actually happened).
 5. The `governance` summary is consistent with the recorded admission and gate events: no side-effecting action without a preceding admission, no executed-after-deny, no contradicted gate result (L4).

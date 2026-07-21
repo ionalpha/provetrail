@@ -38,6 +38,18 @@ would not have passed. The gate covers:
 Run the same checks locally with `python scripts/check_suite.py`, `npm test` in
 `clients/npm`, `pytest` in `clients/python`, and `cargo test` in `clients/rust`.
 
+Two further checks run on a schedule rather than on pull requests
+(`.github/workflows/external.yml`), because they depend on another repository or on the
+network and neither should be able to block a contribution:
+
+- `scripts/check_vector_drift.py` byte-compares the published vectors against the
+  reference implementation's copy. The suite is generated there and published here
+  (`CONFORMANCE.md` Section 7), so two copies exist and drift between them would mean
+  verifiers are measured against a suite the generator no longer produces.
+- `scripts/check_external_surfaces.py` resolves the `w3id.org` permanent identifier for
+  the predicate type and confirms it still lands where it should, checks provetrail.org
+  is serving, and reports each registry's published version next to this repository's.
+
 ## Conventions
 
 - Professional, neutral tone. Wrap code identifiers in backticks. Do not use em-dashes.

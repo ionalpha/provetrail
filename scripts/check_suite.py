@@ -126,12 +126,17 @@ def check_versions(suite_versions: dict[str, str | None]) -> None:
     """One version string across every surface that carries one."""
     surfaces: dict[str, str | None] = {}
 
-    for doc in ("SPEC.md", "CONFORMANCE.md"):
-        text = (REPO / doc).read_text(encoding="utf-8")
+    # Every document that carries a version header, including each predicate: a
+    # predicate left behind on an older version is a published type identifier
+    # disagreeing with the specification it belongs to.
+    docs = [REPO / "SPEC.md", REPO / "CONFORMANCE.md", *sorted((REPO / "predicates").glob("*.md"))]
+    for doc in docs:
+        rel = str(doc.relative_to(REPO)).replace("\\", "/")
+        text = doc.read_text(encoding="utf-8")
         match = re.search(r"^\*\*Version:\*\*\s*(\S+)", text, re.MULTILINE)
-        surfaces[doc] = match.group(1) if match else None
+        surfaces[rel] = match.group(1) if match else None
         if match is None:
-            fail(f"{doc}: no '**Version:**' header found")
+            fail(f"{rel}: no '**Version:**' header found")
 
     citation = (REPO / "CITATION.cff").read_text(encoding="utf-8")
     match = re.search(r"^version:\s*(\S+)", citation, re.MULTILINE)
