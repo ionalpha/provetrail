@@ -147,10 +147,10 @@ The signed payload is a `run-provenance` statement (see [`predicates/run-provena
 
 Conformance is defined by the public test-vector suite and tier model in [`CONFORMANCE.md`](./CONFORMANCE.md). In summary, a verifier declares the tier it meets:
 
-- **L1 Structural** - canonical-encoding conformance, schema validity, well-formed envelope, single-stream consistency, `seq` monotonicity, fold consistency. No cryptography required. There is no chain-link check at this tier, because there is no `prev_hash` field (Section 2.1); link integrity is the Merkle-root check at L2.
-- **L2 Cryptographic** - signature validity, key binding, algorithm pinning, Merkle-leaf integrity over carried bytes (each event's leaf is committed under the signed root).
-- **L3 Transparency** - inclusion and consistency proofs against signed roots; receipt validity.
-- **L4 Governance-complete** - every side-effecting action has a matching admission record; recorded gate results are consistent with the action stream; outcome claims are bound to a check.
+- **L1 Structural** - canonical-encoding conformance, schema validity, well-formed envelope, single-stream consistency, `seq` monotonicity. No cryptography required. There is no chain-link check at this tier, because there is no `prev_hash` field (Section 2.1); link integrity is the Merkle-root check at L2.
+- **L2 Cryptographic** - signature validity, key binding, algorithm pinning, Merkle-leaf integrity over carried bytes: each event's leaf is committed under the signed root, and a sealed run record's carried events must reproduce the signed root. Run-record root integrity therefore lives at this tier.
+- **L3 Transparency** - standalone inclusion and consistency proofs against signed roots; receipt validity.
+- **L4 Governance-complete** - every side-effecting action has a matching admission record; outcome claims are bound to a check. Gate-result consistency and containment-downgrade detection are deferred beyond this version (see `CONFORMANCE.md` Section 5).
 
 A verifier is Provetrail-conformant at a tier if and only if it accepts every valid vector and rejects every invalid vector at that tier with the registered failure code.
 

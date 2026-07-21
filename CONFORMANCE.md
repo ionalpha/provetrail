@@ -59,9 +59,11 @@ A `manifest.json` entry has the shape:
 A verifier declares the highest tier it meets. The differentiation between a real implementation and a shallow one lives at the upper tiers: a structural-only verifier can pass L1 and L2 but fails L3 and L4, and the suite makes that gap legible.
 
 - **L1 Structural** - canonical-encoding conformance under the deterministic-CBOR profile of specification Section 3.2, schema validity, well-formed envelope, single-stream consistency, `seq` monotonicity. No cryptography required.
-- **L2 Cryptographic** - COSE signature validity, key binding, algorithm pinning (no algorithm substitution), Merkle-leaf integrity over carried bytes (each event's leaf is committed under the signed root).
-- **L3 Transparency** - RFC 9162 inclusion proof against a signed root, consistency proof between two roots, receipt validity.
+- **L2 Cryptographic** - COSE signature validity, key binding, algorithm pinning (no algorithm substitution), Merkle-leaf integrity over carried bytes: each event's leaf is committed under the signed root, and a sealed run record's carried events must reproduce the signed root. Run-record root integrity lives at this tier; the `crypto.run.*` vectors and the `record.*` failure codes are L2.
+- **L3 Transparency** - RFC 9162 standalone inclusion proof against a signed root, consistency proof between two roots, receipt validity.
 - **L4 Governance-complete** - every side-effecting action has a matching admission record, and outcome claims are bound to an independent check. Gate-result consistency and containment-downgrade detection are deferred beyond this version (Section 5).
+
+**Public vocabulary.** Prose about Provetrail sometimes uses a three-word vocabulary: *integrity*, *governance*, and *ground truth*. That triad is communication, not a second tier model, and it maps onto the canonical tiers exactly one way: **integrity = L1-L3** (the record is canonical, signed, and provable), **governance and ground truth = L4** (what the record's events establish about admission and outcomes). A conformance claim MUST name an L-tier; the triad MUST only ever appear alongside this mapping.
 
 ---
 
@@ -108,12 +110,14 @@ Not yet published, and therefore NOT part of conformance at this version: multi-
 - `sign.bad_content_type` - the signed content type is not the expected one (guards algorithm and type substitution).
 - `sign.checkpoint_decode` - the signed payload does not decode as a checkpoint.
 
-### Record / transparency (L3)
-- `merkle.inclusion_invalid` - an inclusion path does not reconstruct the signed root.
-- `merkle.consistency_invalid` - a consistency proof between two roots does not hold (append-only violated).
+### Record integrity (L2)
 - `record.root_mismatch` - the events do not reproduce the signed root.
 - `record.size_mismatch` - the event count does not match the signed size.
 - `record.non_canonical` - the record container is not in canonical form.
+
+### Transparency (L3)
+- `merkle.inclusion_invalid` - an inclusion path does not reconstruct the signed root.
+- `merkle.consistency_invalid` - a consistency proof between two roots does not hold (append-only violated).
 
 ### Governance (L4)
 - `gov.unadmitted_action` - a side-effecting action that completed with no preceding admission record.
