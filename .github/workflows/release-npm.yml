@@ -1,0 +1,64 @@
+name: Release npm package
+
+# Publishes clients/npm when its version in package.json is not yet on the registry.
+# Merge the bump; this does the rest. An ordinary merge finds nothing to do and stops
+# after the plan job.
+#
+# One top-level workflow per registry, sharing logic through `release-plan.yml` and
+# `conformance.yml`. The separation is required by PyPI (see release-pypi.yml); npm
+# does not require it, but all three read alike so none is a special case to remember.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-npm
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    uses: ./.github/workflows/release-plan.yml
+    with:
+      package: npm
+
+  # The same checks a pull request has to pass. A red gate publishes nothing.
+  gate:
+    needs: plan
+    if: needs.plan.outputs.needed == 'true'
+    uses: ./.github/workflows/conformance.yml
+
+  publish:
+    name: Publish to npm
+    needs: [plan, gate]
+    if: needs.plan.outputs.needed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to tag the published commit
+      id-token: write # required for npm provenance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+        working-directory: clients/npm
+      # --provenance attaches a signed attestation linking the tarball to this
+      # repository, commit and workflow run.
+      - run: npm publish --provenance --access public
+        working-directory: clients/npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # A tag, deliberately not a GitHub Release: Zenodo mints a DOI from each Release,
+      # and the DOI belongs to the specification, not to a client package bump.
+      - name: Tag the published commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          gh api "repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/tags/npm-v$VERSION" -f sha="${{ github.sha }}"

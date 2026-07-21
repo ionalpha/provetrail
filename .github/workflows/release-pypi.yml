@@ -1,0 +1,77 @@
+name: Release PyPI package
+
+# Publishes clients/python when its version in pyproject.toml is not yet on PyPI.
+# Merge the bump; this does the rest. An ordinary merge finds nothing to do and stops
+# after the plan job.
+#
+# WHY THIS IS ITS OWN FILE, and must stay named `release-pypi.yml`:
+#
+# A PyPI trusted publisher is bound to a specific workflow *filename*, and PyPI matches
+# it against the entry workflow, not a reusable one it calls. Reusable workflows cannot
+# be trusted publishers at all (pypi/warehouse#11096), so the job that uploads has to
+# live in a top-level file whose name PyPI already trusts. Renaming this file, or
+# folding the upload into a shared release workflow, invalidates the publisher and the
+# upload is rejected.
+#
+# So the filename is part of the release contract. The three registries keep separate
+# top-level workflows for that reason, and share their logic through `release-plan.yml`
+# and `conformance.yml` rather than through a single entry point. npm and crates.io do
+# not have this constraint, but they follow the same shape so all three read alike.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-pypi
+  cancel-in-progress: false
+
+jobs:
+  # Cheap: one job, no build. Every other job is skipped when there is nothing to do,
+  # so this costs a few seconds on an ordinary merge. No path filter on the trigger, so
+  # a release missed because of a registry outage self-heals on the next push.
+  plan:
+    uses: ./.github/workflows/release-plan.yml
+    with:
+      package: pypi
+
+  # The same checks a pull request has to pass. A red gate publishes nothing.
+  gate:
+    needs: plan
+    if: needs.plan.outputs.needed == 'true'
+    uses: ./.github/workflows/conformance.yml
+
+  publish:
+    name: Publish to PyPI
+    needs: [plan, gate]
+    if: needs.plan.outputs.needed == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: write # to tag the published commit
+      id-token: write # trusted publishing (OIDC, no stored token) + PEP 740 attestations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        working-directory: clients/python
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: clients/python/dist
+      # A tag, deliberately not a GitHub Release: Zenodo mints a DOI from each Release,
+      # and the DOI belongs to the specification, not to a client package bump.
+      - name: Tag the published commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          gh api "repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/tags/py-v$VERSION" -f sha="${{ github.sha }}"

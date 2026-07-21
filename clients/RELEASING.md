@@ -18,22 +18,38 @@ procedure.
 - PyPI: `clients/python/pyproject.toml` and `src/provetrail/__init__.py`
 - crates.io: `clients/rust/Cargo.toml` (and `cargo check` to refresh `Cargo.lock`)
 
-`.github/workflows/release.yml` then, on that push:
+Each package has its own workflow (`release-npm.yml`, `release-pypi.yml`,
+`release-crate.yml`). On a push to `main` each one:
 
-1. Runs the **conformance gate** — the same reusable workflow (`conformance.yml`) that
-   every pull request has to pass. A red gate publishes nothing.
-2. Compares each manifest version against what the registry already serves.
-3. Publishes only the packages whose version is not yet published, and tags the
-   commit (`npm-v0.2.0`, `py-v0.2.0`, `crate-v0.2.0`).
+1. Runs `scripts/release_plan.py`, which compares the manifest version against what the
+   registry already serves. If it is already published, the run stops here, in seconds.
+2. Otherwise runs the **conformance gate** — the same reusable workflow
+   (`conformance.yml`) every pull request has to pass. A red gate publishes nothing.
+3. Publishes, and tags the commit (`npm-v0.2.0`, `py-v0.2.0`, `crate-v0.2.0`).
 
-So an ordinary merge that changes no version publishes nothing and is silent, and a
-merge that bumps one manifest publishes exactly that one package. Publishing a version
-that already exists fails at the registry by design, and the version check means a
-re-run never attempts it, so a release cannot be overwritten.
+So an ordinary merge is silent, and a merge that bumps one manifest publishes exactly
+that package. There is no path filter on the trigger, so a release missed because a
+registry was unreachable self-heals on the next push. Publishing an existing version
+fails at the registry by design, and the version check means a re-run never attempts
+it, so a release cannot be overwritten.
 
-The workflow creates a git tag rather than a GitHub Release on purpose: Zenodo mints a
+The workflows create a git tag rather than a GitHub Release on purpose: Zenodo mints a
 DOI from each Release, and the DOI belongs to the specification, not to a client
 package bump.
+
+### Why three workflows rather than one
+
+A PyPI trusted publisher is bound to a specific workflow **filename**, matched against
+the entry workflow. A reusable workflow cannot be a trusted publisher at all
+(`pypi/warehouse#11096`), so the job that uploads to PyPI has to live in a top-level
+file whose name PyPI already trusts. Renaming `release-pypi.yml`, or folding the upload
+into a combined release workflow, invalidates the publisher and the upload is rejected.
+
+The filename is therefore part of the release contract, not an implementation detail.
+The three registries keep separate top-level workflows for that reason and share their
+logic through `release-plan.yml` and `conformance.yml` instead of through a single entry
+point. npm and crates.io have no such constraint, but they follow the same shape so
+none of the three is a special case someone has to remember.
 
 ### Which number to bump
 
@@ -54,7 +70,7 @@ encrypted CI, so there are no long-lived tokens to paste or rotate by hand.
   automatically.
 - **PyPI**: configure a *trusted publisher* (OIDC, no token) at
   `https://pypi.org/manage/project/provetrail/settings/publishing/`:
-  - Owner `ionalpha`, repository `provetrail`, workflow `release.yml`, environment
+  - Owner `ionalpha`, repository `provetrail`, workflow `release-pypi.yml`, environment
     `pypi`.
   - Create a GitHub *environment* named `pypi` in the repository settings.
   PEP 740 attestations are produced automatically on publish.
@@ -62,9 +78,11 @@ encrypted CI, so there are no long-lived tokens to paste or rotate by hand.
   secret `CARGO_REGISTRY_TOKEN`. The workflow attaches a GitHub build-provenance
   attestation for the packaged `.crate`.
 
-> If you configured the PyPI trusted publisher against the old `release-pypi.yml`, edit
-> it to name `release.yml`. A trusted publisher is bound to a specific workflow
-> filename, and publishing fails closed until it matches.
+> **0.1.0 was not published this way.** All three packages went out within three minutes
+> of each other on 2026-06-29, and neither the npm nor the PyPI release carries an
+> attestation, which these workflows produce unconditionally. They were uploaded by
+> hand. Treat the setup above as outstanding, not done: until it is complete, the
+> promise at the top of this document is a promise about 0.2.0 onward.
 
 ## Verifying provenance (for anyone)
 

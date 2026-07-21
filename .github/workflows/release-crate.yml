@@ -1,0 +1,68 @@
+name: Release crate
+
+# Publishes clients/rust when its version in Cargo.toml is not yet on crates.io.
+# Merge the bump; this does the rest. An ordinary merge finds nothing to do and stops
+# after the plan job.
+#
+# One top-level workflow per registry, sharing logic through `release-plan.yml` and
+# `conformance.yml`. The separation is required by PyPI (see release-pypi.yml);
+# crates.io does not require it, but all three read alike so none is a special case to
+# remember.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-crate
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    uses: ./.github/workflows/release-plan.yml
+    with:
+      package: crate
+
+  # The same checks a pull request has to pass. A red gate publishes nothing.
+  gate:
+    needs: plan
+    if: needs.plan.outputs.needed == 'true'
+    uses: ./.github/workflows/conformance.yml
+
+  publish:
+    name: Publish to crates.io
+    needs: [plan, gate]
+    if: needs.plan.outputs.needed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to tag the published commit
+      id-token: write # required for the build-provenance attestation
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Package
+        working-directory: clients/rust
+        run: cargo package
+      # crates.io has no native provenance channel, so attest the packaged .crate here.
+      # Anyone can check it with `gh attestation verify --owner ionalpha`.
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: clients/rust/target/package/provetrail-*.crate
+      - name: Publish
+        working-directory: clients/rust
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      # A tag, deliberately not a GitHub Release: Zenodo mints a DOI from each Release,
+      # and the DOI belongs to the specification, not to a client package bump.
+      - name: Tag the published commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          gh api "repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/tags/crate-v$VERSION" -f sha="${{ github.sha }}"

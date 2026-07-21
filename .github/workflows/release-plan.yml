@@ -1,0 +1,38 @@
+name: Release plan
+
+# Shared by the three publish workflows: decides whether one package's manifest version
+# is already on its registry. Kept reusable so the "publish when the version changes"
+# rule exists once, while each registry keeps its own top-level workflow file (see the
+# note in release-pypi.yml for why that separation is load-bearing).
+on:
+  workflow_call:
+    inputs:
+      package:
+        description: npm, pypi or crate
+        required: true
+        type: string
+    outputs:
+      needed:
+        description: "true when the manifest version is not yet published"
+        value: ${{ jobs.plan.outputs.needed }}
+      version:
+        description: the version the manifest declares
+        value: ${{ jobs.plan.outputs.version }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: ${{ inputs.package }}
+    runs-on: ubuntu-latest
+    outputs:
+      needed: ${{ steps.decide.outputs.needed }}
+      version: ${{ steps.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: decide
+        run: python scripts/release_plan.py ${{ inputs.package }}
