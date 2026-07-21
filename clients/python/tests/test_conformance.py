@@ -1,49 +1,68 @@
 """Conformance: the verifier agrees with the published vectors.
 
+The cases are enumerated from ``vectors/crypto/manifest.json`` rather than listed
+here, so a vector added to the suite immediately becomes a demand on this client.
+What this client is measured on is declared in ``clients/conformance-scope.json``.
+
 These read the suite from the repository; when the package is installed outside
 the repository the vectors are absent and the checks are skipped.
 """
 
+import json
 from pathlib import Path
 
 import pytest
 
 from provetrail import VerifyError, verify_run
 
-# The published conformance test key (also in vectors/crypto/manifest.json). Test only.
-ROOT_KEY = bytes.fromhex(
-    "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664"
-)
+REPO = Path(__file__).resolve().parents[3]
+CRYPTO_DIR = REPO / "vectors" / "crypto"
+SCOPE_PATH = REPO / "clients" / "conformance-scope.json"
 
-CRYPTO_DIR = Path(__file__).resolve().parents[3] / "vectors" / "crypto"
 pytestmark = pytest.mark.skipif(
     not CRYPTO_DIR.exists(), reason="conformance vectors not present"
 )
 
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        "valid/crypto_run_valid_01.cbor",
-        "valid/crypto_governance_valid_01.cbor",
-        "valid/crypto_ground_truth_valid_01.cbor",
-    ],
-)
-def test_valid_records_verify(name):
-    record = (CRYPTO_DIR / name).read_bytes()
-    result = verify_run(record, ROOT_KEY)
-    assert len(result.events) >= 1
+if CRYPTO_DIR.exists():
+    MANIFEST = json.loads((CRYPTO_DIR / "manifest.json").read_text(encoding="utf-8"))
+    SCOPE = json.loads(SCOPE_PATH.read_text(encoding="utf-8"))
+    # The root key comes from the manifest keyring, never pasted in here: a rotated
+    # conformance key must not leave a stale copy behind that still passes.
+    ROOT_KEY = bytes.fromhex(MANIFEST["keyring"][0]["public_key_hex"])
+    VECTORS = MANIFEST["vectors"]
+    SUPPORTED = [v for v in VECTORS if v["kind"] in SCOPE["kinds_supported"]]
+else:  # pragma: no cover - the whole module is skipped in this case
+    MANIFEST, SCOPE, ROOT_KEY, VECTORS, SUPPORTED = None, None, b"", [], []
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        "invalid/crypto_run_root_mismatch_01.cbor",
-        "invalid/crypto_run_size_mismatch_01.cbor",
-        "invalid/crypto_run_bad_signature_01.cbor",
-    ],
-)
-def test_integrity_failures_are_rejected(name):
-    record = (CRYPTO_DIR / name).read_bytes()
-    with pytest.raises(VerifyError):
-        verify_run(record, ROOT_KEY)
+def _is_out_of_scope(vector):
+    """True when the vector's failure sits above the integrity tier."""
+    code = vector.get("failure_code", "")
+    return any(code.startswith(p) for p in SCOPE["out_of_scope_failure_prefixes"])
+
+
+@pytest.mark.parametrize("vector", VECTORS, ids=lambda v: v["id"])
+def test_every_vector_kind_is_declared_in_the_client_scope(vector):
+    declared = set(SCOPE["kinds_supported"]) | set(SCOPE["kinds_unsupported"])
+    assert vector["kind"] in declared, (
+        f"vector {vector['id']} has kind {vector['kind']!r}, declared neither supported "
+        "nor unsupported in clients/conformance-scope.json. New coverage must be "
+        "declared deliberately."
+    )
+
+
+def test_the_manifest_is_reachable():
+    assert SUPPORTED, "no supported vectors found; the manifest path is wrong"
+
+
+@pytest.mark.parametrize("vector", SUPPORTED, ids=lambda v: v["id"])
+def test_the_published_suite_agrees_with_the_verifier(vector):
+    record = (CRYPTO_DIR / vector["artifact"]).read_bytes()
+    # A reject vector whose failure is above the integrity tier is intact at this
+    # tier, so this client must accept it: rejecting would claim a tier it does
+    # not implement.
+    if vector["expect"] == "accept" or _is_out_of_scope(vector):
+        assert len(verify_run(record, ROOT_KEY).events) >= 1
+    else:
+        with pytest.raises(VerifyError):
+            verify_run(record, ROOT_KEY)

@@ -50,6 +50,13 @@ def verify_run(record: bytes, public_key: bytes) -> Verified:
         raise VerifyError(f"decode record: {exc}") from exc
     if not isinstance(rec, dict) or "checkpoint" not in rec or "events" not in rec:
         raise VerifyError("record is not a {checkpoint, events} map")
+    # record.non_canonical: the container must be exactly the two known fields, in
+    # deterministic key order. RFC 8949 Section 4.2 sorts map keys bytewise on their
+    # *encoded* form, so the shorter "events" precedes "checkpoint". An extra field, or
+    # keys out of order, means these bytes are not the canonical encoding of this
+    # record, and two verifiers could disagree about what was signed.
+    if list(rec) != ["events", "checkpoint"]:
+        raise VerifyError("record container is not in canonical form")
     checkpoint = rec["checkpoint"]
     events = rec["events"]
     if not isinstance(checkpoint, (bytes, bytearray)) or not isinstance(events, list):

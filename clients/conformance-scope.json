@@ -1,0 +1,29 @@
+{
+  "_comment": [
+    "What the three client verifiers in this directory are measured on.",
+    "",
+    "The clients implement the integrity tier only: the COSE_Sign1 checkpoint",
+    "signature and the RFC 9162 Merkle root over the events a record carries.",
+    "The governance and ground-truth tiers ship in the Go reference verifier.",
+    "",
+    "Each client's conformance test enumerates vectors/crypto/manifest.json and",
+    "derives its expectations from this file, so a vector added to the suite",
+    "changes what CI demands of every client without anyone editing a test. A",
+    "vector whose kind is listed in neither array fails the test by design: new",
+    "coverage must be declared here deliberately, not absorbed silently."
+  ],
+
+  "tier": "integrity",
+
+  "kinds_supported": ["run", "governance", "ground_truth"],
+
+  "kinds_unsupported": ["checkpoint", "event_proof", "consistency"],
+
+  "_out_of_scope_comment": [
+    "Reject vectors whose failure is above the integrity tier. These records are",
+    "cryptographically intact and an integrity-tier verifier MUST accept them:",
+    "rejecting one would mean the client is guessing at a tier it does not",
+    "implement. The suite still carries them so the boundary is tested, not assumed."
+  ],
+  "out_of_scope_failure_prefixes": ["gov.", "shallow."]
+}

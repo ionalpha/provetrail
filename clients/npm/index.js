@@ -53,6 +53,15 @@ export function verifyRun(record, publicKey) {
   if (rec === null || typeof rec !== "object" || !("checkpoint" in rec) || !("events" in rec)) {
     throw new VerifyError("record is not a {checkpoint, events} map");
   }
+  // record.non_canonical: the container must be exactly the two known fields, in
+  // deterministic key order. RFC 8949 Section 4.2 sorts map keys bytewise on their
+  // *encoded* form, so the shorter "events" precedes "checkpoint". An extra field, or
+  // keys out of order, means these bytes are not the canonical encoding of this
+  // record, and two verifiers could disagree about what was signed.
+  const keys = Object.keys(rec);
+  if (keys.length !== 2 || keys[0] !== "events" || keys[1] !== "checkpoint") {
+    throw new VerifyError("record container is not in canonical form");
+  }
   const checkpoint = rec.checkpoint;
   const events = rec.events;
   if (!(checkpoint instanceof Uint8Array) || !Array.isArray(events)) {
