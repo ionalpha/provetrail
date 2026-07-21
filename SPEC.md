@@ -266,6 +266,52 @@ consistency-proof = { after: bstr, proof: [ * bstr .size 32 ], before: bstr }
 
 `before` and `after` are each a tagged COSE_Sign1 checkpoint; `proof` is the RFC 9162 Section 2.1.4.2 consistency path from the `before` tree to the `after` tree (`merkle.consistency_invalid` on failure).
 
+### 8.7 L4 semantics: governance
+
+L4 verification runs over the events of an already-verified record (Sections 8.2-8.5): it assumes authenticity and order, and checks what the signed bytes then mean. Its vocabulary is ordinary events — reserved `type` values and payload keys, not new wire structures.
+
+**The admission lifecycle** is the event family:
+
+| `type` | Meaning | Payload |
+|---|---|---|
+| `dispatch.start` | The action named by `call` was admitted and began. | `call`: int |
+| `dispatch.end` | The action named by `call` completed. | `call`: int |
+| `dispatch.rejected` | The action named by `call` was refused admission. | `call`: int |
+
+`call` is an integer correlation id pairing one invocation's lifecycle events. A verifier MUST read it tolerantly across the integer representations a CBOR or JSON round trip can produce (an integral float is accepted as its integer value), so a record remains verifiable after passing through a JSON store.
+
+**What "side-effecting" means at this version:** exactly the `dispatch.*` family. A producer marks an action as side-effecting — and thereby subject to the admission invariants — by emitting its lifecycle through this family. Events of any other `type` are outside governance scope at v0.1; a future version may widen the family, never silently reinterpret existing types.
+
+**The invariants a verifier MUST enforce:**
+
+1. **Admission completeness** (`gov.unadmitted_action`): every `dispatch.end` MUST carry a well-formed `call` that a `dispatch.start` with the same `call` admitted *earlier in the stream*. A completion with a missing or malformed `call` is equally unadmitted — it claims a completion no admission can be matched to, and the check fails closed.
+2. **Denial is final** (`gov.admission_denied_but_executed`): no `call` may appear as both `dispatch.rejected` and `dispatch.end`, in either order. A denial after the fact contradicts the execution just as a denial before it does.
+
+A `dispatch.start` or `dispatch.rejected` without a well-formed `call` is inert: it admits or refuses nothing.
+
+### 8.8 L4 semantics: ground truth
+
+Outcome binding separates two properties that "verifiable" usually conflates: integrity asks whether these are the genuine, unaltered bytes from an identified principal; outcome binding asks whether a claim of success carries a machine-checkable reference to a check that actually passed. A record can be perfectly signed and prove nothing.
+
+**The vocabulary:**
+
+| `type` | Meaning | Payload |
+|---|---|---|
+| `check.recorded` | The verdict of a verification. | `check`: int (the check's own id), `passed`: bool |
+| `outcome.recorded` | A claimed result of a run or step. | `result`: tstr; `check`: int (the grounding check's id) when bound |
+
+**The binding rule a verifier MUST enforce** (`shallow.no_ground_truth`): every `outcome.recorded` whose `result` is `"success"` MUST carry a `check` reference to a `check.recorded` event *in the same record* whose `passed` is `true`. The check may appear before or after the outcome — the binding is over the record, not the ordering. A success with no `check` key, a reference to a check the record does not contain, or a reference to a check whose `passed` is not `true`, is rejected. The flagship reject vector is precisely a record whose only event is `outcome.recorded {"result": "success"}`: signed, not proven. An outcome whose `result` is not `"success"` requires no backing check — a recorded failure or partial result is never penalized for honesty. A `check.recorded` with a malformed `check` id, or whose `passed` is absent or not `true`, grounds nothing.
+
+**Omission over false attestation.** A control that did not run MUST be represented by the absence of its record, never by a present record asserting a result the control did not produce. Where no ground-truth check exists for a task, a conformant record says so by carrying no binding — turning "no ground truth" from a silent default into a machine-detectable, auditable state. This rule is what makes the distinction between signed and proven detectable rather than a matter of presentation.
+
+**Independence, to the extent the wire carries it.** The check's own envelope attributes it: `actor` categorizes who recorded it and `principal` names the authority it was recorded under (Section 2.1). A verifier MAY reject, by policy, a binding whose check was performed by the same authority that performed the action. The wire makes the attribution visible; the independence judgment is policy.
+
+### 8.9 What L4 does and does not claim
+
+Outcome binding is not a correctness oracle. Provetrail standardizes the binding and its verification, not the quality of the bound check: a gameable check that passes still verifies. What the standard guarantees is narrower and more durable — the presence or absence of a binding, and the attribution of the bound check, are machine-checkable, so a gameable check becomes a named, attributable artifact rather than an invisible gap, and relying parties can set policy on the distinction. L4 is also unreachable by wrappers: a post-hoc converter around a runtime that did not emit admission and check events has nothing truthful to bind, and fabricating those events requires the signing authority — which is an attributable act, not a presentation choice.
+
+L4 at this version means exactly the two invariants of Section 8.7 and the binding rule of Section 8.8. Gate-result consistency, containment-downgrade detection, self-graded-check rejection, and empty-governance flagging are named and explicitly deferred, identically in `CONFORMANCE.md` Section 5: they are not part of conformance at this version, have no published vectors, and a verifier is not measured on them.
+
 ---
 
 ## References
