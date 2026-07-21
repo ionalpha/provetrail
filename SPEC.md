@@ -314,6 +314,48 @@ L4 at this version means exactly the two invariants of Section 8.7 and the bindi
 
 ---
 
+## 9. Security considerations
+
+This chapter calibrates every claim this repository makes: nothing elsewhere in the specification, the conformance documents, or the client documentation may claim more than this chapter supports.
+
+### 9.1 Trust model
+
+Verification proves that the carried bytes are the exact bytes committed under a root that a key in the verifier's keyring signed, that the events are canonical and ordered, and — at L4 — that the recorded events satisfy the admission and outcome-binding invariants of Sections 8.7-8.8. It does not prove that the events describe what actually happened: the record is only as strong as the substrate that emits it. Provetrail's guarantees hold when the record is emitted by the component that *mediated* the action, not by the agent narrating itself. A record emitted by an unconstrained agent about its own behaviour can satisfy L1-L3 and still misrepresent what happened; L4 exists precisely to make that difference checkable, and a relying party SHOULD treat an L1-L3-only record as attestation of bytes, not proof of outcome.
+
+Trust does not disappear in these systems; it moves. A governed runtime that emits the record asks a relying party to trust the runtime — a smaller and better-anchored trust than trusting an unbounded, non-deterministic agent to report on itself, because a runtime is a small, fixed, inspectable component whose records are tamper-evident and independently verifiable. A compromised or dishonest runtime is therefore detectable in a way a self-reporting agent is not.
+
+**The keyring.** A verifier obtains trusted public keys out of band and indexes them by the `kid` the protected header carries (Section 8.4). The `kid` is a lookup handle, not an identity: the binding of a key to a real-world producer identity is out of scope and MUST be established externally (a deployment's key distribution, an identity system referenced via `principal`). Key rotation at v0.1 is keyring membership: adding a key under a `kid` rotates it, removing it revokes it, and there is no in-band rotation or revocation signal. The conformance suite's published test key is test material only and MUST NOT be trusted in production.
+
+### 9.2 Threat matrix
+
+Verdicts: **prevents** (the attack cannot yield an accepting verification), **detects** (verification fails when the attack occurred), **limits** (partial defense; residual stated), **does not address** (out of scope at this version; mitigation named where one exists).
+
+| Threat | Verdict | Mechanism / residual |
+|---|---|---|
+| Forged record (no keyring key) | prevents | COSE signature over the root; `sign.unknown_key`, `sign.signature_invalid`. |
+| Altered event bytes | detects | Leaf rehash no longer reproduces the signed root (`record.root_mismatch`). |
+| Reordered events | detects | `seq` strict monotonicity plus root mismatch (`chain.non_monotonic_seq`, `record.root_mismatch`). |
+| Dropped or inserted events | detects | Count vs signed `size`, and the root (`record.size_mismatch`, `record.root_mismatch`). |
+| Truncation: a genuinely signed *earlier* record presented as current | does not address | Freshness is out of scope at v0.1. A stale record verifies, because it is authentic. Mitigations: consistency proofs between checkpoints (Section 8.6) and an external transparency anchor; a relying party needing freshness MUST obtain the latest checkpoint out of band. |
+| Equivocation / split-view logs | limits | Consistency proofs detect divergence *between two presented roots*; a signer-operator can still show different parties different histories. Full defense requires registration in an external Transparency Service (RFC 9943). |
+| Backdating a root | limits | A self-signed root can claim any `time`. External anchoring bounds when a root could have existed; a deployment that anchors only to self-signed roots retains this residual trust in the operator and SHOULD say so. |
+| Signing-key compromise | does not address | Records signed before revocation are indistinguishable from honest ones. Keyring removal stops acceptance of new records; an external anchor bounds the forgery window. There is no in-band revocation at v0.1. |
+| Cross-stream / cross-record splicing | prevents | The checkpoint's `origin` binds the signed root to the log that produced it, and events carry `stream`; a root replayed against another log's events fails (`record.root_mismatch`, `chain.stream_mismatch`). |
+| Parser differentials across languages | limits | The deterministic profile, the carry-the-bytes rule, and the canonical re-derivation check remove the ambiguity classes; the mutant-derived vectors (duplicate keys, indefinite lengths, non-minimal heads, trailing bytes, type confusion) pin verifier agreement. Residual: a verifier outside the conformance suite can still diverge — which is what conformance claims are for. |
+| PII / secrets in payloads | does not address | v0.1 has no redaction mechanism; payload content is the producer's responsibility. See Section 9.4. |
+| Verifier misconfiguration (claiming a tier it does not enforce) | limits | Reject vectors make a false tier claim falsifiable: a verifier claiming a tier is measured against every reject vector at that tier. The claim discipline itself is policy (`CONFORMANCE.md`). |
+| Producer self-checking (gamed L4) | limits | Independence attribution (Section 8.8): the check's `actor`/`principal` are in signed bytes, so a self-graded binding is visible and rejectable by policy, not prevented. |
+
+### 9.3 Limits of the outcome binding
+
+A bound check is not a proof of correctness. Checks are domain-specific, frequently absent, and where present can be gamed: a check that verifies only a narrow extensional property admits false positives. Provetrail does not claim to eliminate this. It makes three things checkable instead: whether a success is bound to any check at all; whether the bound check is independent of the acting authority; and the identity of the check, so that a gameable check is an attributable, named artifact rather than a silent gap. A relying party retains responsibility for deciding which checks it trusts. The honest posture, enforced by the omission-over-false-attestation rule (Section 8.8), is that an unproven claim is marked unproven rather than dressed as a result.
+
+### 9.4 Selective disclosure and redaction
+
+v0.1 defines no redaction mechanism: a record is disclosed whole, and producers MUST NOT place content in payloads that cannot be disclosed to every intended verifier. Any future redaction mechanism is constrained in advance: an elision MUST preserve the leaf commitment so that inclusion under the signed root still verifies; a verifier MUST NOT treat a well-formed elision as evidence of tampering; and a producer MUST NOT use elision to remove a control record that the omission-over-false-attestation rule requires to be absent-or-true.
+
+---
+
 ## References
 
 - RFC 2119 / RFC 8174 - Requirement keywords
