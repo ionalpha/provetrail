@@ -2,7 +2,7 @@
 
 A verifier for **Provetrail**, an open standard for verifiable execution provenance.
 
-> **Status: draft (`0.1.x`).** This package verifies the integrity tier of a sealed run record: the COSE_Sign1 checkpoint signature and the RFC 9162 Merkle root over the carried events. The on-the-wire format is not frozen until v0.1.0, so do not yet rely on it as a production security control.
+> **Status: draft (`0.2.x`).** This package verifies the integrity tier of a sealed run record: the COSE_Sign1 checkpoint signature and the RFC 9162 Merkle root over the carried events. The on-the-wire format is not frozen until v0.1.0, so do not yet rely on it as a production security control.
 
 ## What Provetrail is
 
