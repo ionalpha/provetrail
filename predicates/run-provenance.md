@@ -3,7 +3,7 @@
 **Version:** 0.1.0-draft
 **Status:** DRAFT.
 
-`run-provenance` is the Provetrail statement type: the signed payload that asserts what an agent run did and under what governance. It is intentionally a thin, neutral statement layered on existing standards, not a new envelope format.
+`run-provenance` is the Provetrail statement type: the signed assertion that a run's event stream is what it claims to be. It is intentionally a thin, neutral statement layered on existing standards, not a new envelope format. At v0.1 the statement is deliberately minimal: it names exactly the artifact the reference implementation signs and the conformance vectors pin, nothing more. Fields that are designed but not yet implemented anywhere are listed in the appendix as candidates for `/v0.2`, not asserted here.
 
 ## Type identifier
 
@@ -15,38 +15,44 @@ https://w3id.org/provetrail/predicates/run-provenance/v0.1
 
 (The identifier is the stable contract. It is a permanent identifier on the W3C Permanent Identifier service (`w3id.org`) that redirects to the current canonical reference, so it stays fixed even if the hosting moves. It is not bound to any single implementation.)
 
-## Carriers
+### URI versioning policy
 
-The same logical statement can be carried two ways:
+The versioned path is immutable once its specification version freezes: after the v0.1.0 freeze, the document `/v0.1` names may be clarified but never changed in meaning. Any breaking change to the statement mints a new path (`/v0.2`); at specification 1.0 the URI becomes `/v1`, and verifiers accept both `/v0.x` and `/v1` during migration. After 1.0, minor specification versions never change the URI and follow the in-toto monotonic principle: a statement valid under `/v1` at 1.0 remains valid under `/v1` at every later 1.x. Old version paths stay resolvable forever. Any future JSON-profile field names use lowerCamelCase, per in-toto guidance.
 
-- **Primary (COSE / CBOR):** a SCITT-style signed statement. The protected header binds the statement and its metadata; the payload is the canonical-CBOR `run-provenance` body. This is the authoritative form.
-- **JSON profile (optional, non-authoritative):** an in-toto attestation whose `predicateType` is the identifier above and whose `predicate` is the same body. Provided for compatibility with JSON supply-chain tooling.
+## The v0.1 statement: the signed checkpoint
 
-## Statement body
-
-The body references a run and binds it to its event stream:
+The v0.1 `run-provenance` statement **is the signed checkpoint** of specification Section 8.4: a COSE_Sign1 (tag 18) whose protected header carries algorithm `-19` (Ed25519), the content type `application/vnd.provetrail.checkpoint+cbor`, and the signing key id, and whose payload is the canonical CBOR map:
 
 | Field | Meaning |
 |---|---|
-| `run_id` | The identifier of the run this statement is about. |
-| `stream` | The event stream identifier (Section 2.1 of the spec). |
-| `head` | The stream head this statement attests to: the event count (`size`) the signed root covers. |
-| `root` | The signed Merkle root (RFC 9162) over the stream's events at `head`, the commitment any inclusion proof reconstructs. |
-| `principal` | The identity on whose authority the run executed, as an external identity reference (`did`, verifiable credential, or agent-identity record). Provetrail references identity; it does not define it. Named to match the event field of the same meaning in Section 2.1 of the specification, where `actor` is the coarse category (`agent`, `human`, `system`) and `principal` is the identity-bearing field. |
-| `fold_digest` | A digest of the deterministic fold of the stream up to `head`, so a verifier can bind the attested final state to the events. |
-| `governance` | A summary of the admission and gate records present (Sections 2.2 and 2.3 of the spec), sufficient for an L4 verifier to check that no side-effecting action ran without admission. |
-| `schema_version` | The schema version of this statement body. |
+| `root` | The signed RFC 9162 Merkle root (32 bytes, SHA-256) over the stream's events, the commitment any inclusion proof reconstructs. |
+| `size` | The event count the signed root covers: the stream head this statement attests to. |
+| `origin` | The identifier of the log (the run/stream scope) that produced the root, binding the root to its log so it cannot be replayed against another. |
+
+The statement travels inside the sealed run record (`{events, checkpoint}`, specification Section 8.5), as a standalone checkpoint, or embedded in a proof artifact (Section 8.6). Every field above is exercised by published conformance vectors.
+
+Registration in a SCITT Transparency Service is indirect by design (specification Section 4.2): the checkpoint carries a minimal protected header with no CWT Claims, and a registering party wraps or countersigns it as its own Signed Statement (`application/vnd.provetrail.statement+cose`, reserved). A JSON-profile carrier is RESERVED for a post-freeze minor version; at v0.1 the COSE/CBOR form is the only specified carrier.
 
 ## What a verifier checks
 
-Per the conformance tiers:
+Exactly the published conformance checks, by tier:
 
-1. The carried event bytes rehash to leaves that reconstruct the signed Merkle `root` at the attested `head`.
-2. The COSE signature(s) verify under the key bound to `principal`.
-3. If `root` is present, the inclusion proof reconstructs the signed root (L3).
-4. `fold_digest` matches the verifier's own re-fold of the carried events (binds the claim to what actually happened).
-5. The `governance` summary is consistent with the recorded admission and gate events: no side-effecting action without a preceding admission, no executed-after-deny, no contradicted gate result (L4).
+1. The COSE signature verifies under a key in the verifier's keyring, with the pinned algorithm and content type (L2).
+2. The carried event bytes are canonical, ordered, and rehash to leaves that reconstruct the signed `root` at the signed `size` (L2).
+3. A standalone inclusion or consistency proof reconstructs, or connects, signed roots (L3).
+4. The recorded events satisfy the admission and outcome-binding invariants of specification Sections 8.7-8.8 (L4).
 
 ## What it deliberately does not assert
 
 `run-provenance` does not assert that the run was "good," "safe," or "successful." It asserts what happened, in what order, under what recorded governance, in a form an independent party can verify. Quality or policy judgements are layered on top by whoever consumes the record.
+
+## Appendix: candidate fields for `/v0.2`
+
+These fields were part of the original statement design. None is implemented by any producer, signed by any reference path, or exercised by any vector, so none is part of `/v0.1`. They are recorded here so the design intent survives without the permanent identifier naming an unimplemented artifact.
+
+| Candidate field | Intent | What must exist first |
+|---|---|---|
+| `run_id` | A stable identifier for the run the statement is about, distinct from the log-scoping `origin`. | A producer-side identity scheme for runs. |
+| `principal` | The external identity on whose authority the run executed, lifted from the event level to the statement level. | A ruling on how statement-level identity interacts with the per-event `principal` field. |
+| `fold_digest` | A digest of the deterministic fold of the stream, binding an attested final state to the events. | A declared-fold mechanism: a normative, cross-producer fold function identified by name. No such definition exists anywhere yet, which is why the field is absent rather than underspecified. |
+| `governance` | A precomputed summary of admission and gate records, so an L4 verdict is reachable without replaying every event. | A canonical summary encoding plus vectors proving it consistent with the event stream. |

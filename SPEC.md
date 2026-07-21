@@ -55,7 +55,7 @@ Ordering within a stream is carried by `seq` alone. A record MAY carry a contigu
 
 **Standardizable contract:**
 
-- A run's state is the **fold** of its event stream. State is a deterministic function of the log; replay is re-fold. A conforming verifier MUST be able to reject a record whose carried final state disagrees with the re-fold of its events.
+- A run's state is the **fold** of its event stream. State is a deterministic function of the log; replay is re-fold. This is an architectural principle at v0.1, not a verifier requirement: a record carries events, not a final state, so there is no carried state to check against a re-fold. A future version that introduces an attested state digest (see the `/v0.2` candidate fields in [`predicates/run-provenance.md`](./predicates/run-provenance.md)) must first define a normative, named fold function; until then no fold check is part of conformance.
 - `schema_version`, together with an upcast rule, defines forward and backward evolution, so older records stay verifiable as the format grows. Producers MUST set `schema_version`; verifiers MUST apply the declared upcast for versions they support and MUST reject records whose version they cannot upcast rather than silently mis-interpret them.
 - The value model is I-JSON (RFC 7493) compatible, encoded canonically per Section 3.
 
@@ -103,7 +103,7 @@ Rationale for CBOR over canonical JSON:
 - The load-bearing `seq` and `time` fields are 64-bit integers and may exceed 2^53. RFC 8785 (JSON Canonicalization Scheme) numbers are IEEE-754 doubles, whose exact-integer range ends at 2^53 regardless of signedness, so JCS cannot represent them without a string-encoding workaround; CBOR encodes integers exactly. `time` as Unix nanoseconds crosses 2^53 in the ordinary course of events, not as an edge case.
 - The neighbouring transparency and signing standards Provetrail aligns with (Section 4) are CBOR and COSE based.
 
-A non-canonical JSON projection of a record MAY be produced for human inspection or debugging. It is never hashed, never signed, and is not authoritative. A JSON profile that re-canonicalizes to CBOR before hashing is a valid interoperability path; a profile that hashes JSON independently is not, because it would create a second set of bytes claiming to be the same event.
+A non-canonical JSON projection of a record MAY be produced for human inspection or debugging. It is never hashed, never signed, and is not authoritative. A signed JSON profile is RESERVED for a post-freeze minor version (Section 7); its one pre-committed constraint is that it must re-canonicalize to CBOR before hashing, because a profile that hashes JSON independently would create a second set of bytes claiming to be the same event.
 
 ---
 
@@ -121,7 +121,7 @@ Signing uses **COSE** (RFC 9052) over the canonical CBOR bytes. COSE is the CBOR
 
 The signed checkpoint deliberately carries a **minimal protected header**: algorithm, content type, and key id, nothing else. In particular it does not carry the CWT Claims header (label 15) that RFC 9943 requires of a Signed Statement, so a checkpoint is not itself directly registrable in a SCITT Transparency Service. Registration is **indirect by design**: a party registering a checkpoint wraps or countersigns it as its own SCITT Signed Statement (media type `application/vnd.provetrail.statement+cose`), keeping the frozen checkpoint surface small and leaving issuer/subject identity to the layer that actually asserts it. Rationale: identity claims baked into the checkpoint would freeze a producer-identity scheme prematurely, and an independent attestation layer can add them later without changing checkpoint bytes.
 
-A JSON-profile compatibility layer MAY sign using DSSE with pre-authentication encoding; this profile is secondary and non-authoritative.
+A signed JSON profile (DSSE-carried) is RESERVED for a post-freeze minor version; at v0.1 the COSE/CBOR form is the only specified carrier (Sections 3.2 and 7).
 
 ### 4.3 Transparency and receipts
 
@@ -129,15 +129,15 @@ An append-only log of statements uses **RFC 9162** (Certificate Transparency v2)
 
 ### 4.4 Statement layering
 
-The signed payload is a `run-provenance` statement (see [`predicates/run-provenance.md`](./predicates/run-provenance.md)). Under COSE it is carried as a signed statement; a JSON profile MAY carry it as an in-toto predicate. The predicate type identifier is descriptive and vendor-neutral.
+The v0.1 statement **is the signed checkpoint of Section 8.4** — the artifact the reference implementation actually signs and the vectors pin; [`predicates/run-provenance.md`](./predicates/run-provenance.md) is its predicate document and records the candidate fields deferred to `/v0.2`. The predicate type identifier is descriptive, vendor-neutral, and governed by the URI versioning policy in that document and Section 7. A JSON/in-toto carrier is RESERVED for a post-freeze minor version.
 
 ### 4.5 Reuse map
 
 | Layer | Reuse |
 |---|---|
 | Value model | I-JSON (RFC 7493), encoded as deterministic CBOR (RFC 8949 Section 4.2) |
-| Signing | COSE (RFC 9052), Ed25519 (RFC 8032); DSSE+PAE as an optional JSON profile |
-| Statement layering | SCITT-style signed statement (COSE); in-toto predicate as the JSON-profile analogue |
+| Signing | COSE (RFC 9052), Ed25519 (RFC 8032); a DSSE-carried JSON profile is reserved post-freeze |
+| Statement layering | SCITT-style signed statement (COSE); an in-toto predicate carrier is reserved post-freeze |
 | Append-only log + proofs | RFC 9162 (Certificate Transparency v2) |
 | Portable credentials (optional) | W3C Verifiable Credentials data model |
 
@@ -172,6 +172,8 @@ Adoption strategy is by composition: a Provetrail record references the identiti
 
 - The record carries `schema_version` per event type; evolution is governed by an upcast rule so older records remain verifiable.
 - The specification itself is versioned. Breaking changes increment the major version. The conformance suite is versioned in lockstep; a verifier reports the suite version and tier it passes.
+- **Predicate URI policy** (the SLSA/in-toto pattern; normative alongside `predicates/run-provenance.md`): a versioned predicate path is immutable once its specification version freezes. A breaking change to the statement mints the next path (`/v0.2`); at 1.0 the URI becomes `/v1` and verifiers accept both during migration; post-1.0 minor versions never change the URI and follow the in-toto monotonic principle. Old version paths stay resolvable forever.
+- Reserved for post-freeze minor versions, in this order of intent: a signed JSON profile (Sections 3.2 and 4.2), a SCITT-native statement carrier (`application/vnd.provetrail.statement+cose`, Section 4.2), and the `/v0.2` candidate statement fields listed in the predicate document. A minor version adds; it never changes frozen bytes.
 - Before v0.1.0 is tagged, any part of this draft may change. After the freeze, the on-the-wire format is a stable contract.
 
 ---
