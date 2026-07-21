@@ -18,6 +18,26 @@ This is a pre-1.0 draft. The on-the-wire format is not frozen until `v0.1.0` is 
 2. For a concrete change, open a pull request against the affected document and reference the issue.
 3. For conformance changes, describe the case, the expected verdict, and the failure code, so it can be added to the suite defined in `CONFORMANCE.md`.
 
+## What CI checks
+
+Every pull request runs the conformance gate (`.github/workflows/conformance.yml`), and
+the release pipeline runs the same workflow, so nothing is published that a pull request
+would not have passed. The gate covers:
+
+- `python scripts/check_suite.py` - every vector a manifest names exists on disk, every
+  vector on disk is named by exactly one manifest entry, every failure code a vector
+  pins is registered in `CONFORMANCE.md`, and one version string spans `SPEC.md`,
+  `CONFORMANCE.md`, `CITATION.cff` and both manifests.
+- The three client verifiers in `clients/`, each run against the published vectors.
+  Their cases are **enumerated from `vectors/crypto/manifest.json`**, not hand-listed, so
+  adding a vector to the suite immediately becomes a demand on every client. What the
+  clients are measured on is declared in `clients/conformance-scope.json`; a vector of a
+  kind that file does not mention fails the build until the scope is updated
+  deliberately.
+
+Run the same checks locally with `python scripts/check_suite.py`, `npm test` in
+`clients/npm`, `pytest` in `clients/python`, and `cargo test` in `clients/rust`.
+
 ## Conventions
 
 - Professional, neutral tone. Wrap code identifiers in backticks. Do not use em-dashes.

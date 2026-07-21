@@ -1,0 +1,20 @@
+name: CI
+
+# Runs the conformance gate on every pull request and every push to main. The release
+# pipeline calls the same reusable workflow, so "CI is green" and "safe to publish"
+# mean the same thing here.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    uses: ./.github/workflows/conformance.yml
