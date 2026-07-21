@@ -45,7 +45,7 @@ Provetrail is **not** a new identity system, a new transport, or a new tool prot
 Provetrail is designed so a verifier in **any language** can check a record without re-implementing the producer:
 
 - The proof **carries the exact canonical bytes** of each event. A verifier **rehashes the bytes it is given**; it never re-serializes. Cross-language verification cannot drift on encoding differences.
-- The canonical encoding is **deterministic CBOR** (CDE profile); signatures use **COSE**; the append-only log uses **RFC 9162**-style inclusion and consistency proofs; signatures are **Ed25519**. A non-canonical JSON projection may be emitted for humans, but it is never what is hashed or signed.
+- The canonical encoding is **deterministic CBOR** (RFC 8949 Section 4.2 Core Deterministic Encoding, with the tightenings in the specification); signatures use **COSE**; the append-only log uses **RFC 9162**-style inclusion and consistency proofs; signatures are **Ed25519**. A non-canonical JSON projection may be emitted for humans, but it is never what is hashed or signed.
 
 Conformance is defined by a public test-vector suite (see [`CONFORMANCE.md`](./CONFORMANCE.md)): a verifier is Provetrail-conformant if and only if it accepts every valid vector and rejects every tampered vector with the correct failure code.
 

@@ -23,7 +23,7 @@ A portable, third-party-verifiable record of **what an agent did and under what 
 
 - **Not content provenance.** C2PA answers "is this media authentic and by whom." Provetrail answers "what actions did an agent take, in what order, under what authority, and can you prove the record is untampered." They are complementary layers.
 - **Not a tool-connection protocol** (that is MCP) and **not an agent-to-agent transport** (that is A2A). Provetrail is the provenance layer those can carry or reference.
-- **Not an identity system.** The actor of an event is an identity expressed in an external standard (for example a `did`, a verifiable credential, or an agent-identity record). Provetrail references identity; it does not define it.
+- **Not an identity system.** The `principal` of an event is an identity expressed in an external standard (for example a `did`, a verifiable credential, or an agent-identity record). Provetrail references identity; it does not define it.
 - **Not a new language or runtime.** One record format, many independent verifiers.
 
 ---
@@ -37,15 +37,21 @@ The envelope is the wire format of one immutable, ordered event. An event has th
 | Field | Type | Meaning |
 |---|---|---|
 | `stream` | string | The identifier of the ordered stream this event belongs to. |
-| `seq` | uint64 | Monotonic sequence number within the stream. MUST strictly increase by 1 with no gaps. |
-| `time` | timestamp | The producer's recorded time of the event. Advisory; ordering is by `seq`, not `time`. |
+| `seq` | int64 | Sequence number within the stream. MUST strictly increase between adjacent events. |
+| `time` | int64 | The producer's recorded time, as Unix nanoseconds in UTC. Advisory; ordering is by `seq`, not `time`. |
 | `type` | string | The event type, namespaced. |
-| `actor` | identity | Who caused the event (agent, human, or system), expressed as an external identity reference. |
+| `actor` | string | The coarse category of who produced the event: `agent`, `human`, or `system`. This is a category, not an identity; see `principal`. |
 | `payload` | object | The type-specific body. |
-| `schema_version` | uint64 | The schema version of `payload` for this `type`. |
+| `schema_version` | int | The schema version of `payload` for this `type`. |
 | `causation_id` | string | OPTIONAL. The id of the event that caused this one, enabling exact causal replay. |
+| `principal` | string | OPTIONAL. The external identity on whose authority the event was produced, expressed as a reference into an external identity standard (for example a `did`, a verifiable credential, or an agent-identity record). This is the identity-bearing field. |
+| `origin_instance_id` | string | OPTIONAL. The producing runtime instance, distinguishing events emitted by different instances that write to the same logical stream. |
+| `trace_id` | string | OPTIONAL. Distributed-trace correlation, so an operational trace and this record can be lined up. |
+| `span_id` | string | OPTIONAL. Distributed-trace span correlation, as `trace_id`. |
 
-Ordering within a stream is carried by `seq` alone. Tamper-evidence is not a per-event field: each event's canonical bytes are committed as a leaf in the append-only Merkle log of Section 4, and the signed root over those leaves is what makes any alteration detectable. There is therefore no `prev_hash` field.
+The seven fields `stream`, `seq`, `time`, `type`, `actor`, `payload`, and `schema_version` are REQUIRED and MUST always be encoded, including when a value is empty. The five OPTIONAL fields are string-valued and MUST be omitted entirely when empty, and MUST be present when set. This omit-when-empty rule is normative rather than cosmetic: field presence changes the canonical bytes of Section 3, and therefore changes the leaf commitment and the signature over it. A producer that encodes an empty optional field, or omits a set one, produces bytes that will not reproduce the expected leaf.
+
+Ordering within a stream is carried by `seq` alone. A record MAY carry a contiguous slice of a longer stream, so `seq` gaps between adjacent carried events are permitted; what a verifier MUST reject is `seq` that repeats or decreases, which is a reordering or replay rather than a window. Tamper-evidence is not a per-event field: each event's canonical bytes are committed as a leaf in the append-only Merkle log of Section 4, and the signed root over those leaves is what makes any alteration detectable. There is therefore no `prev_hash` field.
 
 **Standardizable contract:**
 
@@ -83,17 +89,21 @@ A Merkle log is only verifiable in another language if that language can reprodu
 
 ### 3.2 Canonical encoding
 
-The canonical encoding is **deterministic CBOR** under the CBOR Common Deterministic Encoding (CDE) profile.
+The canonical encoding is **deterministic CBOR** as defined by RFC 8949 Section 4.2 (Core Deterministic Encoding), with the following tightenings, which a conforming decoder MUST enforce:
+
+- Duplicate map keys MUST be rejected.
+- Indefinite-length items MUST be rejected.
+- Bytes trailing a complete encoding MUST be rejected.
+- A text string that is not valid UTF-8 MUST be rejected.
+
+Core Deterministic Encoding already requires that map keys are sorted bytewise, that integers use their shortest form, and that floats use the shortest form that round-trips. The tightenings above close the remaining ambiguities that would let two distinct byte strings claim to be the same event. This profile is compatible with the direction of the CBOR Common Deterministic Encoding (CDE) work, which is tracked as informative; the normative reference is RFC 8949 Section 4.2 plus the four rules above, because that is what an implementation can conform to today.
 
 Rationale for CBOR over canonical JSON:
 
-- The load-bearing `seq` field is a `uint64` and may exceed 2^53. RFC 8785 (JSON Canonicalization Scheme) numbers are IEEE-754 doubles and cannot represent such integers without a string-encoding workaround; CBOR encodes integers exactly.
+- The load-bearing `seq` and `time` fields are 64-bit integers and may exceed 2^53. RFC 8785 (JSON Canonicalization Scheme) numbers are IEEE-754 doubles, whose exact-integer range ends at 2^53 regardless of signedness, so JCS cannot represent them without a string-encoding workaround; CBOR encodes integers exactly. `time` as Unix nanoseconds crosses 2^53 in the ordinary course of events, not as an edge case.
 - The neighbouring transparency and signing standards Provetrail aligns with (Section 4) are CBOR and COSE based.
-- Deterministic CBOR is being tightened into a single interoperable profile (CDE), removing the historical ambiguity of RFC 8949 Section 4.2.
 
-A non-canonical JSON projection of a record MAY be produced for human inspection or debugging. It is never hashed, never signed, and is not authoritative.
-
-> DRAFT note: the choice of CBOR/CDE over JCS is settled for this draft but remains open to review before the v0.1.0 freeze. The carry-the-bytes rule in Section 3.1 makes a verifier largely indifferent to this choice, since it rehashes carried bytes regardless.
+A non-canonical JSON projection of a record MAY be produced for human inspection or debugging. It is never hashed, never signed, and is not authoritative. A JSON profile that re-canonicalizes to CBOR before hashing is a valid interoperability path; a profile that hashes JSON independently is not, because it would create a second set of bytes claiming to be the same event.
 
 ---
 
@@ -123,7 +133,7 @@ The signed payload is a `run-provenance` statement (see [`predicates/run-provena
 
 | Layer | Reuse |
 |---|---|
-| Value model | I-JSON (RFC 7493), encoded as deterministic CBOR (CDE) |
+| Value model | I-JSON (RFC 7493), encoded as deterministic CBOR (RFC 8949 Section 4.2) |
 | Signing | COSE (RFC 9052), Ed25519 (RFC 8032); DSSE+PAE as an optional JSON profile |
 | Statement layering | SCITT-style signed statement (COSE); in-toto predicate as the JSON-profile analogue |
 | Append-only log + proofs | RFC 9162 (Certificate Transparency v2) |
@@ -135,7 +145,7 @@ The signed payload is a `run-provenance` statement (see [`predicates/run-provena
 
 Conformance is defined by the public test-vector suite and tier model in [`CONFORMANCE.md`](./CONFORMANCE.md). In summary, a verifier declares the tier it meets:
 
-- **L1 Structural** - canonical-encoding conformance, schema validity, chain-link presence, `seq` monotonicity, fold consistency. No cryptography required.
+- **L1 Structural** - canonical-encoding conformance, schema validity, well-formed envelope, single-stream consistency, `seq` monotonicity, fold consistency. No cryptography required. There is no chain-link check at this tier, because there is no `prev_hash` field (Section 2.1); link integrity is the Merkle-root check at L2.
 - **L2 Cryptographic** - signature validity, key binding, algorithm pinning, Merkle-leaf integrity over carried bytes (each event's leaf is committed under the signed root).
 - **L3 Transparency** - inclusion and consistency proofs against signed roots; receipt validity.
 - **L4 Governance-complete** - every side-effecting action has a matching admission record; recorded gate results are consistent with the action stream; outcome claims are bound to a check.
@@ -150,7 +160,7 @@ Provetrail is designed to slot beside, not displace:
 
 - **C2PA** secures content provenance; Provetrail secures execution provenance. An agent that produces media can carry both.
 - **MCP / A2A** connect tools and agents; Provetrail records what was done across those connections.
-- **Agent-identity standards** (`did`, verifiable credentials, agent passports) answer who an actor is and what it is authorized to do; Provetrail's `actor` field references them and records what that actor then did.
+- **Agent-identity standards** (`did`, verifiable credentials, agent passports) answer who an actor is and what it is authorized to do; Provetrail's `principal` field references them and records what that identity then did.
 
 Adoption strategy is by composition: a Provetrail record references the identities and connections defined elsewhere and adds the verifiable execution record those layers lack.
 
@@ -168,8 +178,8 @@ Adoption strategy is by composition: a Provetrail record references the identiti
 
 - RFC 2119 / RFC 8174 - Requirement keywords
 - RFC 7493 - The I-JSON Message Format
-- RFC 8949 - Concise Binary Object Representation (CBOR); Section 4.2 deterministic encoding
-- CBOR Common Deterministic Encoding (CDE) - `draft-ietf-cbor-cde`
+- RFC 8949 - Concise Binary Object Representation (CBOR); Section 4.2 Core Deterministic Encoding (normative for Section 3.2)
+- CBOR Common Deterministic Encoding (CDE) - `draft-ietf-cbor-cde` (informative)
 - RFC 9052 - CBOR Object Signing and Encryption (COSE)
 - RFC 8032 - Edwards-Curve Digital Signature Algorithm (Ed25519)
 - RFC 9162 - Certificate Transparency Version 2.0
