@@ -117,7 +117,9 @@ Each event's canonical bytes are committed as a leaf in the append-only Merkle l
 
 ### 4.2 Signing
 
-Signing uses **COSE** (RFC 9052) over the canonical CBOR bytes. COSE is the CBOR-native signing standard used by the neighbouring transparency and content-provenance ecosystems and supports multiple signatures. Signatures are **Ed25519** (RFC 8032).
+Signing uses **COSE** (RFC 9052) over the canonical CBOR bytes. COSE is the CBOR-native signing standard used by the neighbouring transparency and content-provenance ecosystems and supports multiple signatures. Signatures are **Ed25519** (RFC 8032), carried under the fully-specified COSE algorithm identifier **-19** (`Ed25519`, RFC 9864); the earlier polymorphic identifier -8 (`EdDSA`) is deprecated by IANA and MUST NOT be produced. The protected content type of a signed checkpoint is `application/vnd.provetrail.checkpoint+cbor`; media type names live in the vendor tree (RFC 6838 Section 3.1) because unfaceted names in the standards tree require IESG action.
+
+The signed checkpoint deliberately carries a **minimal protected header**: algorithm, content type, and key id, nothing else. In particular it does not carry the CWT Claims header (label 15) that RFC 9943 requires of a Signed Statement, so a checkpoint is not itself directly registrable in a SCITT Transparency Service. Registration is **indirect by design**: a party registering a checkpoint wraps or countersigns it as its own SCITT Signed Statement (media type `application/vnd.provetrail.statement+cose`), keeping the frozen checkpoint surface small and leaving issuer/subject identity to the layer that actually asserts it. Rationale: identity claims baked into the checkpoint would freeze a producer-identity scheme prematurely, and an independent attestation layer can add them later without changing checkpoint bytes.
 
 A JSON-profile compatibility layer MAY sign using DSSE with pre-authentication encoding; this profile is secondary and non-authoritative.
 
