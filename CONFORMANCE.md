@@ -14,9 +14,9 @@ These follow the mature cryptographic and provenance test suites (Wycheproof, th
 1. **Well-formed wrapper, malformed unit-under-test only.** The suite manifest and per-vector metadata are always valid; only the individual record under test may be malformed. Each invalid vector isolates exactly one defect, so a failure is unambiguous.
 2. **Byte-exact expected outputs.** Each vector carries the exact canonical bytes; the verifier rehashes the bytes it is given (never re-serializes), matching the carry-the-bytes rule in the specification.
 3. **Named, stable failure codes.** A rejection MUST name which check failed, using a code from the registry in Section 6, not a free-form string. A verifier that rejects a vector for the wrong reason is non-conformant.
-4. **Attack-class flags.** Each vector is tagged with its class so coverage gaps are visible and reports can group failures.
-5. **Separate producer and verifier conformance.** A producer is conformant if every record it emits is accepted by a conformant verifier; a verifier is conformant if it matches the suite verdicts. The two roles use different vector sets.
-6. **Schema-validated, deterministically regenerable.** Every suite file validates against a published JSON Schema, and the golden files regenerate deterministically (fixed test keys, fixed seeds).
+4. **Class-tagged vectors.** Every vector carries its class so coverage gaps are visible and reports can group failures: a structural vector carries its attack-class `flags`, and a cryptographic vector carries its `kind` (the check that applies) and `tier`.
+5. **Separate producer and verifier conformance.** A producer is conformant if every record it emits is accepted by a conformant verifier; a verifier is conformant if it matches the suite verdicts. The two roles use different vector sets; this version publishes verifier vector sets only. Producer-conformance vector sets are deferred (Section 4): this principle describes the model, not this version's published artifacts.
+6. **Schema-validated, deterministically regenerable.** Both manifests validate against the published JSON Schema, [`schema/manifest.schema.json`](./schema/manifest.schema.json), enforced by `scripts/check_suite.py`; the golden files regenerate deterministically (fixed test keys, fixed seeds).
 
 ---
 
@@ -37,20 +37,35 @@ vectors/
 The signing key for the `crypto/` vectors is a fixed, test-only Ed25519 key published
 in `crypto/manifest.json` under `keyring`, clearly marked not for production.
 
-A `manifest.json` entry has the shape:
+The two suites carry structurally distinct manifests. They share a common core - every entry names an `id`, an `expect` verdict (`accept` or `reject`), a `description`, and a `failure_code` on every reject entry - and differ in how a vector names its class and its files. Both validate against [`schema/manifest.schema.json`](./schema/manifest.schema.json).
+
+A **structural** (`structural/manifest.json`) entry carries the suite `tier` at the top level of the manifest and per-vector attack-class `flags`, and names its files under `events`:
 
 ```json
 {
-  "id": "invalid.chain.non_monotonic_seq.01",
-  "tier": "L1",
-  "role": "verifier",
-  "file": "invalid/chain/non_monotonic_seq_01.cbor",
+  "id": "invalid.enc.trailing_bytes.01",
   "expect": "reject",
-  "failure_code": "chain.non_monotonic_seq",
-  "flags": ["Ordering", "ChainIntegrity"],
-  "description": "seq decreases between two adjacent events in the same stream."
+  "failure_code": "enc.trailing_bytes",
+  "flags": ["Encoding"],
+  "description": "A canonical event followed by one extra trailing byte.",
+  "events": ["invalid/invalid_enc_trailing_bytes_01.cbor"]
 }
 ```
+
+A **crypto** (`crypto/manifest.json`) entry carries a per-vector `tier` and a `kind` (which selects the check that applies), and names its single file under `artifact`:
+
+```json
+{
+  "id": "crypto.checkpoint.valid.01",
+  "tier": "L2",
+  "kind": "checkpoint",
+  "expect": "accept",
+  "description": "A COSE_Sign1 checkpoint over a three-leaf Merkle head, signed by the root key.",
+  "artifact": "valid/crypto_checkpoint_valid_01.cbor"
+}
+```
+
+Files are laid out flat under `valid/` and `invalid/`, with the class encoded in the filename prefix (`invalid_enc_trailing_bytes_01.cbor`); a multi-event structural vector carries one file per event with a trailing `_0`, `_1`, `_2` index. The nested-directory form (`invalid/chain/...`) does not exist. Every reject entry's `description` names its exact single mutation (Section 7), so the defect is auditable from the manifest alone.
 
 ---
 
@@ -180,6 +195,20 @@ Section 5 lists the codes a **vector** pins. The registry is wider than that, be
 2. **Valid vectors are produced by the real signing and chaining path**, never hand-authored, so they are genuinely valid. Hand-authoring would risk a subtly wrong "valid" vector becoming canon and forcing the defect into every conformant verifier.
 3. **Invalid vectors are produced by generating a valid record then applying exactly one documented mutation** (flip a byte, drop the admission event, re-sort a map). The mutation is recorded in the vector description so the defect is auditable.
 4. Outputs are golden-pinned; CI regenerates and diffs. Drift is either an intentional, version-bumped spec change or a bug.
-5. The suite is versioned (`suite-vX.Y`); a verifier reports the suite version and tier it passed.
+5. The suite version tracks the specification version: it is the `suite_version` field in each `manifest.json`, and `scripts/check_suite.py` enforces one version string across SPEC.md, CONFORMANCE.md, CITATION.cff, `registry.json`, and both manifests, so a bump cannot reach some surfaces and not others. A verifier reports the suite version and the tier it passed.
 
 > The structural and cryptographic vectors are published in [`vectors/`](./vectors/). They may be regenerated before the v0.1.0 format freeze; after the freeze they are a stable contract.
+
+---
+
+## 8. Making a conformance claim
+
+A conformance claim is self-declared and takes exactly one form:
+
+> **Provetrail \<L-tier\>, suite \<version\>** - for example, "Provetrail L4, suite 0.1.0".
+
+The claim names the highest tier (Section 3) the implementation meets against the published suite at the stated suite version, and nothing else. The three-word public vocabulary (*integrity*, *governance*, *ground truth*) MUST NOT stand in for the tier in a claim; it may appear only alongside the L-tier mapping of Section 3.
+
+A claim is invalidated by any of: a suite-version bump the implementation has not been re-run against; a single published vector at the claimed tier whose registered verdict the implementation does not reach; or an unregistered or wrong failure code emitted for any reject vector at the claimed tier.
+
+"Provetrail" is a trademark of Ion Alpha (see [`LICENSE-docs`](./LICENSE-docs)). A conformance claim describes an implementation's behavior against this suite; it is not a certification by Ion Alpha and grants no trademark rights. A certification-mark program, under which an independent steward would certify implementations, is future work recorded in [`GOVERNANCE.md`](./GOVERNANCE.md); no such program exists at this version.

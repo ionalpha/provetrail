@@ -26,7 +26,7 @@ The v0.1 `run-provenance` statement **is the signed checkpoint** of specificatio
 | Field | Meaning |
 |---|---|
 | `root` | The signed RFC 9162 Merkle root (32 bytes, SHA-256) over the stream's events, the commitment any inclusion proof reconstructs. |
-| `size` | The event count the signed root covers: the stream head this statement attests to. |
+| `size` | The event count the signed root covers: the position in the stream this statement attests to. The wire field is `size`; informal prose has called this the stream "head," but normative text uses `size` (see [`GLOSSARY.md`](../GLOSSARY.md)). |
 | `origin` | The identifier of the log (the run/stream scope) that produced the root, binding the root to its log so it cannot be replayed against another. |
 
 The statement travels inside the sealed run record (`{events, checkpoint}`, specification Section 8.5), as a standalone checkpoint, or embedded in a proof artifact (Section 8.6). Every field above is exercised by published conformance vectors.

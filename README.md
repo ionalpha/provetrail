@@ -54,10 +54,16 @@ Conformance is defined by a public test-vector suite (see [`CONFORMANCE.md`](./C
 ```
 SPEC.md                      the specification (DRAFT v0.1.0)
 CONFORMANCE.md               the conformance vector suite design + failure-code registry
+GLOSSARY.md                  one definition per term, shared across the documents
 predicates/run-provenance.md the run-provenance statement/predicate definition
 docs/                        design rationale (the "signed vs proven" argument)
 vectors/                     the published conformance vectors (structural L1 and cryptographic L2-L4)
+schema/manifest.schema.json  the published JSON Schema the conformance manifests validate against
 clients/                     independent verifiers (the provetrail crate, PyPI, and npm packages)
+GOVERNANCE.md                how the standard changes, who maintains it, the registry policy
+VERSIONING.md                what a version promises, what a breaking change is, the freeze charter
+SECURITY.md                  how to report a vulnerability, and the scope
+PATENTS.md                   the patent non-assertion covenant for implementations
 LICENSE                      Apache-2.0 (code, schemas, vectors)
 LICENSE-docs                 CC-BY-4.0 (specification prose)
 ```
@@ -84,9 +90,18 @@ This is an early public draft published to invite review and to fix the format b
 
 The cryptographic layer is implemented in the reference implementation, so a record can be cryptographically verified against a signing key today. The on-the-wire format is not frozen until v0.1.0, so do not rely on a Provetrail record as a production security control before then.
 
+## Governance and policy
+
+- [GOVERNANCE.md](./GOVERNANCE.md) - how a normative change lands (issue, PR, accompanying vector, version bump), who maintains the standard, and the failure-code registry policy.
+- [VERSIONING.md](./VERSIONING.md) - what a version promises across each surface, what counts as a breaking change, and what the `v0.1.0` freeze fixes.
+- [SECURITY.md](./SECURITY.md) - how to report a vulnerability, the scope split, and what is not a vulnerability (the public test key).
+- [PATENTS.md](./PATENTS.md) - the patent non-assertion covenant for conformant implementations of the specification.
+
+Conformance is self-declared in the form defined in [`CONFORMANCE.md`](./CONFORMANCE.md) Section 8: **Provetrail \<L-tier\>, suite \<version\>**.
+
 ## License
 
-Specification prose is licensed under [CC-BY-4.0](./LICENSE-docs). Code, schemas, and conformance vectors are licensed under [Apache-2.0](./LICENSE). Provetrail is a trademark of Ion Alpha.
+Specification prose is licensed under [CC-BY-4.0](./LICENSE-docs). Code, schemas, and conformance vectors are licensed under [Apache-2.0](./LICENSE). Ion Alpha additionally grants a [patent non-assertion covenant](./PATENTS.md) for conformant implementations of the specification. Provetrail is a trademark of Ion Alpha.
 
 ## Contributing
 

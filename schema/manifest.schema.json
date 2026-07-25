@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://w3id.org/provetrail/schema/manifest/v0.1",
+  "title": "Provetrail conformance manifest",
+  "description": "The published schema for the two conformance manifests (vectors/structural/manifest.json and vectors/crypto/manifest.json). The two suites share a common core (every entry names an id, an expected verdict, a description, and a failure_code on every reject entry) and differ in how a vector names its files and its class: a structural manifest carries the suite tier at the top level, per-vector attack-class flags, and an events file list; a crypto manifest carries a keyring, a per-vector tier and kind, and a single artifact. scripts/check_suite.py validates both files against this schema.",
+  "oneOf": [
+    { "$ref": "#/$defs/structuralManifest" },
+    { "$ref": "#/$defs/cryptoManifest" }
+  ],
+  "$defs": {
+    "suiteVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "vectorId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+    },
+    "expect": {
+      "enum": ["accept", "reject"]
+    },
+    "failureCode": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+    },
+    "relativePath": {
+      "type": "string",
+      "pattern": "^(valid|invalid)/[A-Za-z0-9_./-]+\\.cbor$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rejectRequiresCode": {
+      "if": {
+        "properties": { "expect": { "const": "reject" } },
+        "required": ["expect"]
+      },
+      "then": { "required": ["failure_code"] },
+      "else": { "not": { "required": ["failure_code"] } }
+    },
+    "structuralManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suite_version", "tier", "vectors"],
+      "properties": {
+        "suite_version": { "$ref": "#/$defs/suiteVersion" },
+        "tier": { "const": "L1" },
+        "vectors": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/structuralEntry" }
+        }
+      }
+    },
+    "structuralEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "expect", "flags", "description", "events"],
+      "properties": {
+        "id": { "$ref": "#/$defs/vectorId" },
+        "expect": { "$ref": "#/$defs/expect" },
+        "failure_code": { "$ref": "#/$defs/failureCode" },
+        "flags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "description": { "$ref": "#/$defs/description" },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/relativePath" }
+        }
+      },
+      "$ref": "#/$defs/rejectRequiresCode"
+    },
+    "cryptoManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suite_version", "tiers", "keyring", "vectors"],
+      "properties": {
+        "suite_version": { "$ref": "#/$defs/suiteVersion" },
+        "tiers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["L2", "L3", "L4"] }
+        },
+        "keyring": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/keyringEntry" }
+        },
+        "vectors": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/cryptoEntry" }
+        }
+      }
+    },
+    "keyringEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key_id", "algorithm", "public_key_hex"],
+      "properties": {
+        "key_id": { "type": "string", "minLength": 1 },
+        "algorithm": { "type": "string", "minLength": 1 },
+        "public_key_hex": { "type": "string", "pattern": "^[0-9a-f]+$" }
+      }
+    },
+    "cryptoEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tier", "kind", "expect", "description", "artifact"],
+      "properties": {
+        "id": { "$ref": "#/$defs/vectorId" },
+        "tier": { "enum": ["L2", "L3", "L4"] },
+        "kind": {
+          "enum": ["checkpoint", "run", "event_proof", "consistency", "governance", "ground_truth"]
+        },
+        "expect": { "$ref": "#/$defs/expect" },
+        "failure_code": { "$ref": "#/$defs/failureCode" },
+        "description": { "$ref": "#/$defs/description" },
+        "artifact": { "$ref": "#/$defs/relativePath" }
+      },
+      "$ref": "#/$defs/rejectRequiresCode"
+    }
+  }
+}

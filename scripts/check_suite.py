@@ -11,10 +11,14 @@ on disk and in a manifest.json"; nothing enforced that until this script. It che
   3. Vector ids are unique within a manifest.
   4. Reject vectors carry a failure_code; accept vectors do not.
   5. Every failure_code used is registered in CONFORMANCE.md.
-  6. One version string across SPEC.md, CONFORMANCE.md, CITATION.cff and both
+  6. Both manifests validate against the published JSON Schema
+     (schema/manifest.schema.json).
+  7. One version string across SPEC.md, CONFORMANCE.md, CITATION.cff and both
      manifests, so a version bump cannot land on some surfaces and not others.
 
 Run with no arguments from anywhere; exits non-zero with an explanation on failure.
+Check 6 needs the `jsonschema` package (the conformance workflow installs it); if it
+is absent the script says so and fails rather than skipping a published check.
 """
 
 from __future__ import annotations
@@ -122,6 +126,40 @@ def check_failure_codes_are_registered() -> None:
                 )
 
 
+def check_manifest_schemas() -> None:
+    """Both manifests validate against the published JSON Schema.
+
+    The schema (schema/manifest.schema.json) is what CONFORMANCE.md principle 6
+    promises: a machine-readable contract for the manifest shape, so a malformed
+    or field-drifted manifest fails here rather than at some downstream verifier.
+    """
+    try:
+        import jsonschema
+    except ImportError:
+        fail(
+            "jsonschema is not installed, so the manifests cannot be validated "
+            "against schema/manifest.schema.json. Run `pip install jsonschema` "
+            "(the conformance workflow installs it)."
+        )
+        return
+
+    schema_path = REPO / "schema" / "manifest.schema.json"
+    if not schema_path.exists():
+        fail("schema/manifest.schema.json is missing; the manifest schema must be published")
+        return
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    validator = jsonschema.Draft202012Validator(schema)
+
+    for name in SUITES:
+        manifest_path = REPO / "vectors" / name / "manifest.json"
+        if not manifest_path.exists():
+            continue
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for err in sorted(validator.iter_errors(manifest), key=lambda e: list(e.path)):
+            loc = "/".join(str(p) for p in err.path) or "<root>"
+            fail(f"{name}/manifest.json: schema violation at {loc}: {err.message}")
+
+
 def check_registry() -> str | None:
     """registry.json agrees with the manifests and with CONFORMANCE.md.
 
@@ -182,7 +220,12 @@ def check_versions(suite_versions: dict[str, str | None], registry_version: str 
     # Every document that carries a version header, including each predicate: a
     # predicate left behind on an older version is a published type identifier
     # disagreeing with the specification it belongs to.
-    docs = [REPO / "SPEC.md", REPO / "CONFORMANCE.md", *sorted((REPO / "predicates").glob("*.md"))]
+    docs = [
+        REPO / "SPEC.md",
+        REPO / "CONFORMANCE.md",
+        REPO / "GLOSSARY.md",
+        *sorted((REPO / "predicates").glob("*.md")),
+    ]
     for doc in docs:
         rel = str(doc.relative_to(REPO)).replace("\\", "/")
         text = doc.read_text(encoding="utf-8")
@@ -214,6 +257,7 @@ def check_versions(suite_versions: dict[str, str | None], registry_version: str 
 def main() -> int:
     suite_versions = {name: check_suite(name) for name in SUITES}
     check_failure_codes_are_registered()
+    check_manifest_schemas()
     registry_version = check_registry()
     check_versions(suite_versions, registry_version)
 

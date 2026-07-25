@@ -4,7 +4,7 @@ Provetrail is an open, vendor-neutral standard for verifiable execution provenan
 
 ## Status
 
-This is a pre-1.0 draft. The on-the-wire format is not frozen until `v0.1.0` is tagged, so changes to `SPEC.md`, `CONFORMANCE.md`, and the predicate definitions are expected. Until the cryptographic layer is implemented, the standard provides structural guarantees only; please do not describe a record as "cryptographically verifiable" before then.
+This is a pre-1.0 draft. The on-the-wire format is not frozen until `v0.1.0` is tagged, so changes to `SPEC.md`, `CONFORMANCE.md`, and the predicate definitions are expected. The cryptographic layer (the RFC 9162 Merkle log, COSE signing, and signed roots) is implemented in the reference implementation and exercised by the published vectors, so a record can be cryptographically verified against a signing key today; until the format freezes, treat any record as a draft artifact and do not rely on it as a production security control.
 
 ## Design philosophy
 
@@ -12,11 +12,11 @@ This is a pre-1.0 draft. The on-the-wire format is not frozen until `v0.1.0` is 
 - Keep the standard implementation-neutral. It is not bound to any single implementation, and any conformant producer or verifier in any language is a first-class citizen.
 - Verification MUST NOT require trusting the producer. A change that weakens third-party verifiability is out of scope.
 
-## How to propose a change
+The full change process, the registry-change discipline, and who maintains the standard are in [`GOVERNANCE.md`](./GOVERNANCE.md); [`VERSIONING.md`](./VERSIONING.md) defines what counts as a breaking change. In short:
 
 1. Open an issue describing the problem or gap, using the relevant template.
 2. For a concrete change, open a pull request against the affected document and reference the issue.
-3. For conformance changes, describe the case, the expected verdict, and the failure code, so it can be added to the suite defined in `CONFORMANCE.md`.
+3. For conformance changes, describe the case, the expected verdict, and the failure code, so it can be added to the suite defined in `CONFORMANCE.md`. A normative change that adds or changes a check ships with the vector that exercises it: a rule with no vector does not land.
 
 ## What CI checks
 

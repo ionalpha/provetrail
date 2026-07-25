@@ -24,9 +24,13 @@ crypto/            L2-L4: signed checkpoints, run records, proofs, governance, g
   invalid/         records a conformant verifier MUST reject, one defect each
 ```
 
-Each manifest entry names the vector's `id`, its `tier`, the `kind` of artifact (which
-selects the check that applies), the expected verdict (`accept` or `reject`), and for a
-rejection the `failure_code`.
+Each manifest entry names the vector's `id`, the expected verdict (`accept` or
+`reject`), a `description`, and for a rejection the registered `failure_code`. The two
+suites differ in the rest: a **structural** entry carries the suite `tier` at the top of
+the manifest and per-vector attack-class `flags`, and lists its files under `events`; a
+**crypto** entry carries a per-vector `tier` and a `kind` (which selects the check that
+applies) and names its single file under `artifact`. Both manifests validate against the
+published JSON Schema, [`../schema/manifest.schema.json`](../schema/manifest.schema.json).
 
 ## Tiers covered
 

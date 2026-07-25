@@ -18,9 +18,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # jsonschema validates both manifests against schema/manifest.schema.json.
+      - run: python -m pip install --upgrade jsonschema
       # Every vector the manifests name exists, every vector on disk is named, every
-      # failure code is registered, and one version string spans SPEC, CONFORMANCE,
-      # CITATION and both manifests.
+      # failure code is registered, both manifests validate against the published JSON
+      # Schema, and one version string spans SPEC, CONFORMANCE, CITATION and both
+      # manifests.
       - run: python scripts/check_suite.py
 
   cddl:

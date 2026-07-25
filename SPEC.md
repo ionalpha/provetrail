@@ -7,7 +7,9 @@
 
 The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT, RECOMMENDED, MAY, and OPTIONAL in this document are to be interpreted as described in RFC 2119 and RFC 8174 when, and only when, they appear in all capitals.
 
-Identifiers are written in `code font`. This document avoids implementation-specific detail except where a concrete grounding aids clarity.
+Identifiers are written in `code font`. This document avoids implementation-specific detail except where a concrete grounding aids clarity. Terms are defined once in [`GLOSSARY.md`](./GLOSSARY.md), which every Provetrail document shares; where a term names a wire field, the field name is authoritative.
+
+`provetrail` is the only short token the standard defines. There is no separate media-type token, CLI verb, or header abbreviation: media types are `application/vnd.provetrail.*`, the domain-separation tag is `provetrail/event/v1\n` (Section 8.3), and the client packages are named `provetrail`. No new short token is minted.
 
 A note on maturity: the cryptographic layer (Sections 4.2 and 4.3) is implemented and shipped with a verifier in the reference implementation, so a record can be cryptographically verified against a signing key today. The on-the-wire format is not yet frozen, and the golden conformance vectors are still being published into this repository, so the format is a working draft and MUST NOT be relied on as a production security control before the v0.1.0 freeze.
 
@@ -377,7 +379,7 @@ What v0.1 explicitly does not solve: erasure of already-issued whole records (a 
 - RFC 6962 - Certificate Transparency (the Merkle tree construction the entry profile of Section 8.3 conforms to)
 - RFC 9162 - Certificate Transparency Version 2.0 (Sections 2.1.1, 2.1.3.x, 2.1.4.x; normative for Section 8.3)
 - RFC 9942 - COSE Receipts (`RFC9162_SHA256`, vds = 1)
-- RFC 9943 - An Architecture for Trustworthy and Transparent Digital Supply Chains (SCITT)
+- RFC 9943 - An Architecture for Trustworthy and Transparent Digital Supply Chains (the architecture informally called SCITT)
 - RFC 9964 - ML-DSA for COSE (referenced by the algorithm-agility statement of Section 8.4)
 - RFC 8785 - JSON Canonicalization Scheme (referenced for the optional JSON profile and for the numeric-precision rationale)
 - in-toto attestation framework
