@@ -115,7 +115,7 @@ Provetrail assembles existing standards. It does not invent cryptography.
 
 ### 4.1 Event commitment
 
-Each event's canonical bytes are committed as a leaf in the append-only Merkle log of Section 4.3. The tree is an RFC 6962 / RFC 9162 SHA-256 Merkle tree whose *entry* is the domain-separated, length-framed preimage of the event's canonical bytes — the exact construction, with every constant, is Section 8.3. Domain separation and length framing mean two different events can never share a preimage, and because they live inside the entry the tree matches the `RFC9162_SHA256` verifiable data structure, unlocking RFC 9942 COSE Receipt interoperability. The signed root over these leaves, not a per-event back-pointer, is the tamper-evidence: altering, reordering, dropping, or inserting any event no longer reproduces the signed root.
+Each event's canonical bytes are committed as a leaf in the append-only Merkle log of Section 4.3. The tree is an RFC 6962 / RFC 9162 SHA-256 Merkle tree whose *entry* is the domain-separated, length-framed preimage of the event's canonical bytes; the exact construction, with every constant, is Section 8.3. Domain separation and length framing mean two different events can never share a preimage, and because they live inside the entry the tree matches the `RFC9162_SHA256` verifiable data structure, unlocking RFC 9942 COSE Receipt interoperability. The signed root over these leaves, not a per-event back-pointer, is the tamper-evidence: altering, reordering, dropping, or inserting any event no longer reproduces the signed root.
 
 ### 4.2 Signing
 
@@ -131,7 +131,7 @@ An append-only log of statements uses **RFC 9162** (Certificate Transparency v2)
 
 ### 4.4 Statement layering
 
-The v0.1 statement **is the signed checkpoint of Section 8.4** — the artifact the reference implementation actually signs and the vectors pin; [`predicates/run-provenance.md`](./predicates/run-provenance.md) is its predicate document and records the candidate fields deferred to `/v0.2`. The predicate type identifier is descriptive, vendor-neutral, and governed by the URI versioning policy in that document and Section 7. A JSON/in-toto carrier is RESERVED for a post-freeze minor version.
+The v0.1 statement **is the signed checkpoint of Section 8.4**: the artifact the reference implementation actually signs and the vectors pin; [`predicates/run-provenance.md`](./predicates/run-provenance.md) is its predicate document and records the candidate fields deferred to `/v0.2`. The predicate type identifier is descriptive, vendor-neutral, and governed by the URI versioning policy in that document and Section 7. A JSON/in-toto carrier is RESERVED for a post-freeze minor version.
 
 ### 4.5 Reuse map
 
@@ -176,7 +176,7 @@ Adoption strategy is by composition: a Provetrail record references the identiti
 - The specification itself is versioned. Breaking changes increment the major version. The conformance suite is versioned in lockstep; a verifier reports the suite version and tier it passes.
 - **Predicate URI policy** (the SLSA/in-toto pattern; normative alongside `predicates/run-provenance.md`): a versioned predicate path is immutable once its specification version freezes. A breaking change to the statement mints the next path (`/v0.2`); at 1.0 the URI becomes `/v1` and verifiers accept both during migration; post-1.0 minor versions never change the URI and follow the in-toto monotonic principle. Old version paths stay resolvable forever.
 - Reserved for post-freeze minor versions, in this order of intent: a signed JSON profile (Sections 3.2 and 4.2), a SCITT-native statement carrier (`application/vnd.provetrail.statement+cose`, Section 4.2), the redacted-record container below, and the `/v0.2` candidate statement fields listed in the predicate document. A minor version adds; it never changes frozen bytes.
-- **Reserved redaction path** (normative reservation; no mechanism ships at v0.1): a future redacted-record form is a NEW container kind with its OWN media type, never a reinterpretation of `{events, checkpoint}`. In it, an elided event is carried as its 32-byte **leaf hash** in place of its canonical bytes; the leaf preimage of Section 8.3 is unchanged, so the signed root still verifies over any mix of carried and elided leaves. This works precisely because the leaf is `SHA-256(0x00 || entry)` over a framed entry: the hash can always stand in for the bytes. A v0.1 verifier encountering the new kind rejects it cleanly (`record.decode` — the container is closed, Section 8.5) and can never silently misinterpret it. Any such mechanism is further bound by the constraints of Section 9.4.
+- **Reserved redaction path** (normative reservation; no mechanism ships at v0.1): a future redacted-record form is a NEW container kind with its OWN media type, never a reinterpretation of `{events, checkpoint}`. In it, an elided event is carried as its 32-byte **leaf hash** in place of its canonical bytes; the leaf preimage of Section 8.3 is unchanged, so the signed root still verifies over any mix of carried and elided leaves. This works precisely because the leaf is `SHA-256(0x00 || entry)` over a framed entry: the hash can always stand in for the bytes. A v0.1 verifier encountering the new kind rejects it cleanly (`record.decode`; the container is closed, Section 8.5) and can never silently misinterpret it. Any such mechanism is further bound by the constraints of Section 9.4.
 - Before v0.1.0 is tagged, any part of this draft may change. After the freeze, the on-the-wire format is a stable contract.
 
 ---
@@ -205,7 +205,7 @@ An event is a CBOR map with text-string keys. Seven fields are REQUIRED, five ar
 | `payload` | map | tstr keys; value model below. Always present, possibly empty. |
 | `schema_version` | int | The payload schema version for this `type`. |
 
-An unknown envelope field MUST be rejected. This follows from the canonical-form rule — no canonical event encoding contains one — and the conformance suite pins it (`invalid.schema.unknown_field.01` rejects as `enc.non_canonical_cbor`). A required field whose value is the empty string is well-formed: required fields MUST be encoded even when empty (Section 2.1).
+An unknown envelope field MUST be rejected. This follows from the canonical-form rule (no canonical event encoding contains one), and the conformance suite pins it (`invalid.schema.unknown_field.01` rejects as `enc.non_canonical_cbor`). A required field whose value is the empty string is well-formed: required fields MUST be encoded even when empty (Section 2.1).
 
 **Payload value model.** A payload value is one of: tstr, bstr, int (int64 range), bool, null, an array of payload values, or a map with tstr keys and payload values. Floating-point values and CBOR tags MUST NOT be produced at this version; no published vector contains either. This is the I-JSON (RFC 7493) value model plus byte strings and full-int64 integers; in any JSON projection a bstr is represented as base64url (RFC 4648 Section 5, unpadded), and integers beyond 2^53 lose exactness, which is one reason a JSON projection is never hashed (Section 3.2).
 
@@ -224,7 +224,7 @@ The domain tag is the 20-byte ASCII string `provetrail/event/v1\n` (terminating 
 
 ### 8.4 COSE profile
 
-A checkpoint signature is a **COSE_Sign1** (RFC 9052), and the CBOR tag 18 is REQUIRED on the wire. The protected header is exactly three claims — no more, no fewer:
+A checkpoint signature is a **COSE_Sign1** (RFC 9052), and the CBOR tag 18 is REQUIRED on the wire. The protected header is exactly three claims, no more and no fewer:
 
 | Label | Value |
 |---|---|
@@ -232,7 +232,7 @@ A checkpoint signature is a **COSE_Sign1** (RFC 9052), and the CBOR tag 18 is RE
 | 3 (content type) | `application/vnd.provetrail.checkpoint+cbor` |
 | 4 (kid) | The signing key's identifier, as a byte string, resolved against the verifier's keyring. |
 
-The unprotected header MUST be empty (`{}`). The signature input is the `Sig_structure` of RFC 9052 Section 4.4 with context `"Signature1"` and a zero-length `external_aad` (`h''`). The COSE structure itself is encoded under the Section 8.1 profile. Multi-signature (`COSE_Sign`) is deferred to a future version. Algorithm agility: algorithms are registry-pinned per profile version — SHA-256 and Ed25519/-19 at v0.1 — and a future profile version can add, for example, ML-DSA (RFC 9964, -48/-49/-50) without changing this one.
+The unprotected header MUST be empty (`{}`). The signature input is the `Sig_structure` of RFC 9052 Section 4.4 with context `"Signature1"` and a zero-length `external_aad` (`h''`). The COSE structure itself is encoded under the Section 8.1 profile. Multi-signature (`COSE_Sign`) is deferred to a future version. Algorithm agility: algorithms are registry-pinned per profile version (SHA-256 and Ed25519/-19 at v0.1), and a future profile version can add, for example, ML-DSA (RFC 9964, -48/-49/-50) without changing this one.
 
 The checkpoint payload (the signed bytes) is a CBOR map, canonical key order `root`, `size`, `origin`:
 
@@ -240,7 +240,7 @@ The checkpoint payload (the signed bytes) is a CBOR map, canonical key order `ro
 checkpoint-payload = { root: bstr .size 32, size: uint, origin: tstr }
 ```
 
-All three fields are REQUIRED — including `origin`, which scopes the root to the log that produced it. A payload that is not the exact canonical encoding of this map (missing or extra field, non-canonical key order, a root that is not 32 bytes) MUST be rejected (`sign.checkpoint_decode`).
+All three fields are REQUIRED, including `origin`, which scopes the root to the log that produced it. A payload that is not the exact canonical encoding of this map (missing or extra field, non-canonical key order, a root that is not 32 bytes) MUST be rejected (`sign.checkpoint_decode`).
 
 ### 8.5 Record container
 
@@ -273,7 +273,7 @@ consistency-proof = { after: bstr, proof: [ * bstr .size 32 ], before: bstr }
 
 ### 8.7 L4 semantics: governance
 
-L4 verification runs over the events of an already-verified record (Sections 8.2-8.5): it assumes authenticity and order, and checks what the signed bytes then mean. Its vocabulary is ordinary events — reserved `type` values and payload keys, not new wire structures.
+L4 verification runs over the events of an already-verified record (Sections 8.2-8.5): it assumes authenticity and order, and checks what the signed bytes then mean. Its vocabulary is ordinary events: reserved `type` values and payload keys, not new wire structures.
 
 **The admission lifecycle** is the event family:
 
@@ -285,11 +285,11 @@ L4 verification runs over the events of an already-verified record (Sections 8.2
 
 `call` is an integer correlation id pairing one invocation's lifecycle events. A verifier MUST read it tolerantly across the integer representations a CBOR or JSON round trip can produce (an integral float is accepted as its integer value), so a record remains verifiable after passing through a JSON store.
 
-**What "side-effecting" means at this version:** exactly the `dispatch.*` family. A producer marks an action as side-effecting — and thereby subject to the admission invariants — by emitting its lifecycle through this family. Events of any other `type` are outside governance scope at v0.1; a future version may widen the family, never silently reinterpret existing types.
+**What "side-effecting" means at this version:** exactly the `dispatch.*` family. A producer marks an action as side-effecting, and thereby subject to the admission invariants, by emitting its lifecycle through this family. Events of any other `type` are outside governance scope at v0.1; a future version may widen the family, never silently reinterpret existing types.
 
 **The invariants a verifier MUST enforce:**
 
-1. **Admission completeness** (`gov.unadmitted_action`): every `dispatch.end` MUST carry a well-formed `call` that a `dispatch.start` with the same `call` admitted *earlier in the stream*. A completion with a missing or malformed `call` is equally unadmitted — it claims a completion no admission can be matched to, and the check fails closed.
+1. **Admission completeness** (`gov.unadmitted_action`): every `dispatch.end` MUST carry a well-formed `call` that a `dispatch.start` with the same `call` admitted *earlier in the stream*. A completion with a missing or malformed `call` is equally unadmitted: it claims a completion no admission can be matched to, and the check fails closed.
 2. **Denial is final** (`gov.admission_denied_but_executed`): no `call` may appear as both `dispatch.rejected` and `dispatch.end`, in either order. A denial after the fact contradicts the execution just as a denial before it does.
 
 A `dispatch.start` or `dispatch.rejected` without a well-formed `call` is inert: it admits or refuses nothing.
@@ -305,15 +305,15 @@ Outcome binding separates two properties that "verifiable" usually conflates: in
 | `check.recorded` | The verdict of a verification. | `check`: int (the check's own id), `passed`: bool |
 | `outcome.recorded` | A claimed result of a run or step. | `result`: tstr; `check`: int (the grounding check's id) when bound |
 
-**The binding rule a verifier MUST enforce** (`shallow.no_ground_truth`): every `outcome.recorded` whose `result` is `"success"` MUST carry a `check` reference to a `check.recorded` event *in the same record* whose `passed` is `true`. The check may appear before or after the outcome — the binding is over the record, not the ordering. A success with no `check` key, a reference to a check the record does not contain, or a reference to a check whose `passed` is not `true`, is rejected. The flagship reject vector is precisely a record whose only event is `outcome.recorded {"result": "success"}`: signed, not proven. An outcome whose `result` is not `"success"` requires no backing check — a recorded failure or partial result is never penalized for honesty. A `check.recorded` with a malformed `check` id, or whose `passed` is absent or not `true`, grounds nothing.
+**The binding rule a verifier MUST enforce** (`shallow.no_ground_truth`): every `outcome.recorded` whose `result` is `"success"` MUST carry a `check` reference to a `check.recorded` event *in the same record* whose `passed` is `true`. The check may appear before or after the outcome; the binding is over the record, not the ordering. A success with no `check` key, a reference to a check the record does not contain, or a reference to a check whose `passed` is not `true`, is rejected. The flagship reject vector is precisely a record whose only event is `outcome.recorded {"result": "success"}`: signed, not proven. An outcome whose `result` is not `"success"` requires no backing check: a recorded failure or partial result is never penalized for honesty. A `check.recorded` with a malformed `check` id, or whose `passed` is absent or not `true`, grounds nothing.
 
-**Omission over false attestation.** A control that did not run MUST be represented by the absence of its record, never by a present record asserting a result the control did not produce. Where no ground-truth check exists for a task, a conformant record says so by carrying no binding — turning "no ground truth" from a silent default into a machine-detectable, auditable state. This rule is what makes the distinction between signed and proven detectable rather than a matter of presentation.
+**Omission over false attestation.** A control that did not run MUST be represented by the absence of its record, never by a present record asserting a result the control did not produce. Where no ground-truth check exists for a task, a conformant record says so by carrying no binding, turning "no ground truth" from a silent default into a machine-detectable, auditable state. This rule is what makes the distinction between signed and proven detectable rather than a matter of presentation.
 
 **Independence, to the extent the wire carries it.** The check's own envelope attributes it: `actor` categorizes who recorded it and `principal` names the authority it was recorded under (Section 2.1). A verifier MAY reject, by policy, a binding whose check was performed by the same authority that performed the action. The wire makes the attribution visible; the independence judgment is policy.
 
 ### 8.9 What L4 does and does not claim
 
-Outcome binding is not a correctness oracle. Provetrail standardizes the binding and its verification, not the quality of the bound check: a gameable check that passes still verifies. What the standard guarantees is narrower and more durable — the presence or absence of a binding, and the attribution of the bound check, are machine-checkable, so a gameable check becomes a named, attributable artifact rather than an invisible gap, and relying parties can set policy on the distinction. L4 is also unreachable by wrappers: a post-hoc converter around a runtime that did not emit admission and check events has nothing truthful to bind, and fabricating those events requires the signing authority — which is an attributable act, not a presentation choice.
+Outcome binding is not a correctness oracle. Provetrail standardizes the binding and its verification, not the quality of the bound check: a gameable check that passes still verifies. What the standard guarantees is narrower and more durable: the presence or absence of a binding, and the attribution of the bound check, are machine-checkable, so a gameable check becomes a named, attributable artifact rather than an invisible gap, and relying parties can set policy on the distinction. L4 is also unreachable by wrappers: a post-hoc converter around a runtime that did not emit admission and check events has nothing truthful to bind, and fabricating those events requires the signing authority, which is an attributable act, not a presentation choice.
 
 L4 at this version means exactly the two invariants of Section 8.7 and the binding rule of Section 8.8. Gate-result consistency, containment-downgrade detection, self-graded-check rejection, and empty-governance flagging are named and explicitly deferred, identically in `CONFORMANCE.md` Section 5: they are not part of conformance at this version, have no published vectors, and a verifier is not measured on them.
 
@@ -325,9 +325,9 @@ This chapter calibrates every claim this repository makes: nothing elsewhere in 
 
 ### 9.1 Trust model
 
-Verification proves that the carried bytes are the exact bytes committed under a root that a key in the verifier's keyring signed, that the events are canonical and ordered, and — at L4 — that the recorded events satisfy the admission and outcome-binding invariants of Sections 8.7-8.8. It does not prove that the events describe what actually happened: the record is only as strong as the substrate that emits it. Provetrail's guarantees hold when the record is emitted by the component that *mediated* the action, not by the agent narrating itself. A record emitted by an unconstrained agent about its own behaviour can satisfy L1-L3 and still misrepresent what happened; L4 exists precisely to make that difference checkable, and a relying party SHOULD treat an L1-L3-only record as attestation of bytes, not proof of outcome.
+Verification proves that the carried bytes are the exact bytes committed under a root that a key in the verifier's keyring signed, that the events are canonical and ordered, and, at L4, that the recorded events satisfy the admission and outcome-binding invariants of Sections 8.7-8.8. It does not prove that the events describe what actually happened: the record is only as strong as the substrate that emits it. Provetrail's guarantees hold when the record is emitted by the component that *mediated* the action, not by the agent narrating itself. A record emitted by an unconstrained agent about its own behaviour can satisfy L1-L3 and still misrepresent what happened; L4 exists precisely to make that difference checkable, and a relying party SHOULD treat an L1-L3-only record as attestation of bytes, not proof of outcome.
 
-Trust does not disappear in these systems; it moves. A governed runtime that emits the record asks a relying party to trust the runtime — a smaller and better-anchored trust than trusting an unbounded, non-deterministic agent to report on itself, because a runtime is a small, fixed, inspectable component whose records are tamper-evident and independently verifiable. A compromised or dishonest runtime is therefore detectable in a way a self-reporting agent is not.
+Trust does not disappear in these systems; it moves. A governed runtime that emits the record asks a relying party to trust the runtime: a smaller and better-anchored trust than trusting an unbounded, non-deterministic agent to report on itself, because a runtime is a small, fixed, inspectable component whose records are tamper-evident and independently verifiable. A compromised or dishonest runtime is therefore detectable in a way a self-reporting agent is not.
 
 **The keyring.** A verifier obtains trusted public keys out of band and indexes them by the `kid` the protected header carries (Section 8.4). The `kid` is a lookup handle, not an identity: the binding of a key to a real-world producer identity is out of scope and MUST be established externally (a deployment's key distribution, an identity system referenced via `principal`). Key rotation at v0.1 is keyring membership: adding a key under a `kid` rotates it, removing it revokes it, and there is no in-band rotation or revocation signal. The conformance suite's published test key is test material only and MUST NOT be trusted in production.
 
@@ -346,7 +346,7 @@ Verdicts: **prevents** (the attack cannot yield an accepting verification), **de
 | Backdating a root | limits | A self-signed root can claim any `time`. External anchoring bounds when a root could have existed; a deployment that anchors only to self-signed roots retains this residual trust in the operator and SHOULD say so. |
 | Signing-key compromise | does not address | Records signed before revocation are indistinguishable from honest ones. Keyring removal stops acceptance of new records; an external anchor bounds the forgery window. There is no in-band revocation at v0.1. |
 | Cross-stream / cross-record splicing | prevents | The checkpoint's `origin` binds the signed root to the log that produced it, and events carry `stream`; a root replayed against another log's events fails (`record.root_mismatch`, `chain.stream_mismatch`). |
-| Parser differentials across languages | limits | The deterministic profile, the carry-the-bytes rule, and the canonical re-derivation check remove the ambiguity classes; the mutant-derived vectors (duplicate keys, indefinite lengths, non-minimal heads, trailing bytes, type confusion) pin verifier agreement. Residual: a verifier outside the conformance suite can still diverge — which is what conformance claims are for. |
+| Parser differentials across languages | limits | The deterministic profile, the carry-the-bytes rule, and the canonical re-derivation check remove the ambiguity classes; the mutant-derived vectors (duplicate keys, indefinite lengths, non-minimal heads, trailing bytes, type confusion) pin verifier agreement. Residual: a verifier outside the conformance suite can still diverge, which is what conformance claims are for. |
 | PII / secrets in payloads | does not address | v0.1 has no redaction mechanism; payload content is the producer's responsibility. See Section 9.4. |
 | Verifier misconfiguration (claiming a tier it does not enforce) | limits | Reject vectors make a false tier claim falsifiable: a verifier claiming a tier is measured against every reject vector at that tier. The claim discipline itself is policy (`CONFORMANCE.md`). |
 | Producer self-checking (gamed L4) | limits | Independence attribution (Section 8.8): the check's `actor`/`principal` are in signed bytes, so a self-graded binding is visible and rejectable by policy, not prevented. |
@@ -357,11 +357,11 @@ A bound check is not a proof of correctness. Checks are domain-specific, frequen
 
 ### 9.4 Selective disclosure and redaction
 
-v0.1 defines no redaction mechanism: a record is disclosed whole, and producers MUST NOT place content in payloads that cannot be disclosed to every intended verifier. Any future redaction mechanism is constrained in advance: an elision MUST preserve the leaf commitment so that inclusion under the signed root still verifies; a verifier MUST NOT treat a well-formed elision as evidence of tampering; and a producer MUST NOT use elision to remove a control record that the omission-over-false-attestation rule requires to be absent-or-true. The reserved wire path for such a mechanism — a new container kind carrying leaf hashes in place of elided events — is Section 7.
+v0.1 defines no redaction mechanism: a record is disclosed whole, and producers MUST NOT place content in payloads that cannot be disclosed to every intended verifier. Any future redaction mechanism is constrained in advance: an elision MUST preserve the leaf commitment so that inclusion under the signed root still verifies; a verifier MUST NOT treat a well-formed elision as evidence of tampering; and a producer MUST NOT use elision to remove a control record that the omission-over-false-attestation rule requires to be absent-or-true. The reserved wire path for such a mechanism, a new container kind carrying leaf hashes in place of elided events, is Section 7.
 
 **A producer-side convention (non-normative).** A producer can keep known-sensitive values out of the signed bytes from day one with a salted commitment: replace the sensitive field value with `H(salt || value)` and hold the salt out of band; disclosure to an authorized party is revealing the salt. This needs no format change and no verifier cooperation, and producers handling sensitive data are encouraged to apply it from the first record. Its limits are real: the event's canonical bytes still commit (the *fact* and shape of the event are not redacted, only the value), and an unsalted or low-entropy commitment is guessable.
 
-What v0.1 explicitly does not solve: erasure of already-issued whole records (a circulated record is third-party-verifiable forever), and the full redaction/privacy profile — commitment schemes per field class, replay-level interaction, and the deferred `shallow.self_graded` interplay — which is future-version work.
+What v0.1 explicitly does not solve: erasure of already-issued whole records (a circulated record is third-party-verifiable forever), and the full redaction/privacy profile (commitment schemes per field class, replay-level interaction, and the deferred `shallow.self_graded` interplay), which is future-version work.
 
 ---
 
