@@ -2,7 +2,7 @@
 
 **Status:** Draft (pre-1.0). Process document.
 
-How Provetrail changes, who maintains it, and the rule that keeps the specification and its executable conformance suite from drifting apart. This document is process; `SPEC.md` and `CONFORMANCE.md` are the normative content.
+How Provetrail changes, who maintains it, and the rule that keeps the specification and its executable conformance suite from drifting apart. This document is process; `SPEC.md` and `CONFORMANCE.md` are the normative content. Settled decisions that are not specification text are recorded in [`DECISIONS.md`](./DECISIONS.md).
 
 ## Maintainership
 
