@@ -170,7 +170,7 @@ L4 at this version therefore means exactly two things: **admission completeness*
 
 ## 6. Failure-code registry
 
-Codes are stable, dotted, and layer-prefixed. The registry is itself a published artifact — machine-readable as [`registry.json`](./registry.json) at the repository root, with this section as its prose companion; `scripts/check_suite.py` enforces that the two agree and that every code a manifest pins has a `pinned` entry whose vector list matches the manifests exactly. Adding a code is a versioned change. A conformant verifier MUST emit the registered code, not a free-form string.
+Codes are stable, dotted, and layer-prefixed. The registry is itself a published artifact: machine-readable as [`registry.json`](./registry.json) at the repository root, with this section as its prose companion; `scripts/check_suite.py` enforces that the two agree and that every code a manifest pins has a `pinned` entry whose vector list matches the manifests exactly. Adding a code is a versioned change. A conformant verifier MUST emit the registered code, not a free-form string.
 
 Section 5 lists the codes a **vector** pins. The registry is wider than that, because a verifier meets malformed input that no vector isolates, and a producer can fail before a record exists at all. The full registry:
 

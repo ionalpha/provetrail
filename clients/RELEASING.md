@@ -23,7 +23,7 @@ Each package has its own workflow (`release-npm.yml`, `release-pypi.yml`,
 
 1. Runs `scripts/release_plan.py`, which compares the manifest version against what the
    registry already serves. If it is already published, the run stops here, in seconds.
-2. Otherwise runs the **conformance gate** — the same reusable workflow
+2. Otherwise runs the **conformance gate**, the same reusable workflow
    (`conformance.yml`) every pull request has to pass. A red gate publishes nothing.
 3. Publishes, and tags the commit (`npm-v0.2.0`, `py-v0.2.0`, `crate-v0.2.0`).
 
@@ -55,8 +55,8 @@ none of the three is a special case someone has to remember.
 
 The clients implement the integrity tier, scoped in
 [`conformance-scope.json`](./conformance-scope.json). Pre-1.0, a change that makes a
-verifier **reject a record it previously accepted** is breaking — a consumer's
-previously-passing input now fails — so it takes the minor bump (`0.1.x` → `0.2.0`),
+verifier **reject a record it previously accepted** is breaking (a consumer's
+previously-passing input now fails), so it takes the minor bump (`0.1.x` → `0.2.0`),
 not a patch.
 
 ## One-time setup (per registry)
