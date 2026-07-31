@@ -1,7 +1,7 @@
 # Provetrail glossary
 
-**Version:** 0.1.0-draft
-**Status:** DRAFT.
+**Version:** 0.1.0
+**Status:** Companion to specification v0.1.0.
 
 One definition per term, so `SPEC.md`, `CONFORMANCE.md`, and `predicates/run-provenance.md` use the same words for the same things. Where a term names a wire field, the field name is authoritative and is given in backticks; informal synonyms are noted so they stop drifting into normative text. The specification section that fixes each term is cited.
 

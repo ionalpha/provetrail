@@ -11,7 +11,7 @@
     "deferred = named so the tier boundary is explicit, NOT part of conformance",
     "at this version."
   ],
-  "registry_version": "0.1.0-draft",
+  "registry_version": "0.1.0",
   "codes": [
     {
       "code": "chain.empty",

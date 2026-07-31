@@ -1,7 +1,7 @@
 # The `run-provenance` statement
 
-**Version:** 0.1.0-draft
-**Status:** DRAFT.
+**Version:** 0.1.0
+**Status:** Released with specification v0.1.0. The `/v0.1` predicate path is immutable from this version (`VERSIONING.md`, URI policy).
 
 `run-provenance` is the Provetrail statement type: the signed assertion that a run's event stream is what it claims to be. It is intentionally a thin, neutral statement layered on existing standards, not a new envelope format. At v0.1 the statement is deliberately minimal: it names exactly the artifact the reference implementation signs and the conformance vectors pin, nothing more. Fields that are designed but not yet implemented anywhere are listed in the appendix as candidates for `/v0.2`, not asserted here.
 

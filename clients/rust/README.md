@@ -36,7 +36,7 @@ The cryptographic vectors are signed by a fixed test key published in
 ## Scope
 
 This release verifies the integrity tiers (L1-L3) against conformance suite
-`0.1.0-draft`: strict canonical container decoding, the pinned protected-header claims
+`0.1.0`: strict canonical container decoding, the pinned protected-header claims
 (algorithm -19, the checkpoint content type, key id via `verify_run_keyring`), the
 signature, the closed checkpoint payload, and the Merkle root over the carried events.
 It does not enforce L4 (governance and ground truth), so an L4-claiming record needs an
