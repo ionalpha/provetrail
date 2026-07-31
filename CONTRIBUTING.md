@@ -52,7 +52,7 @@ network and neither should be able to block a contribution:
 
 ## Conventions
 
-- Professional, neutral tone. Wrap code identifiers in backticks. Do not use em-dashes.
+- Keep prose neutral and technical; wrap code identifiers in backticks.
 - Conventional-commit style for commit messages; describe the change on its own technical terms.
 
 ## Licensing of contributions
