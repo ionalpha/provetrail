@@ -3,7 +3,7 @@ name: Release plan
 # Shared by the three publish workflows: decides whether one package's manifest version
 # is already on its registry. Kept reusable so the "publish when the version changes"
 # rule exists once, while each registry keeps its own top-level workflow file (see the
-# note in release-pypi.yml for why that separation is load-bearing).
+# note in release-pypi.yml for why that separation is required).
 on:
   workflow_call:
     inputs:

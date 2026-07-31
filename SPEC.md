@@ -102,7 +102,7 @@ Core Deterministic Encoding already requires that map keys are sorted bytewise, 
 
 Rationale for CBOR over canonical JSON:
 
-- The load-bearing `seq` and `time` fields are 64-bit integers and may exceed 2^53. RFC 8785 (JSON Canonicalization Scheme) numbers are IEEE-754 doubles, whose exact-integer range ends at 2^53 regardless of signedness, so JCS cannot represent them without a string-encoding workaround; CBOR encodes integers exactly. `time` as Unix nanoseconds crosses 2^53 in the ordinary course of events, not as an edge case.
+- The `seq` and `time` fields are 64-bit integers and may exceed 2^53. RFC 8785 (JSON Canonicalization Scheme) numbers are IEEE-754 doubles, whose exact-integer range ends at 2^53 regardless of signedness, so JCS cannot represent them without a string-encoding workaround; CBOR encodes integers exactly. `time` as Unix nanoseconds crosses 2^53 in the ordinary course of events, not as an edge case.
 - The neighbouring transparency and signing standards Provetrail aligns with (Section 4) are CBOR and COSE based.
 
 A non-canonical JSON projection of a record MAY be produced for human inspection or debugging. It is never hashed, never signed, and is not authoritative. A signed JSON profile is RESERVED for a post-freeze minor version (Section 7); its one pre-committed constraint is that it must re-canonicalize to CBOR before hashing, because a profile that hashes JSON independently would create a second set of bytes claiming to be the same event.
@@ -189,7 +189,7 @@ This section pins every constant a verifier needs, so an independent implementat
 
 Every hashed or signed structure is encoded as **deterministic CBOR**: RFC 8949 Section 4.2.1 (Core Deterministic Encoding Requirements), which requires shortest-form integer and length heads, definite lengths only, and map keys sorted bytewise on their *encoded* form. A conforming decoder MUST additionally enforce the four tightenings of Section 3.2: reject duplicate map keys, indefinite-length items, trailing bytes, and invalid UTF-8. For completeness of the profile: there is no integer/float unification (an integral value encoded as a float is a different value), and since floating-point values do not occur in any structure at this version, no float canonicalization rule is exercised; if a future version admits floats, it must state one. The parked CBOR Common Deterministic Encoding draft (`draft-ietf-cbor-cde-13`) is compatible in direction and cited informatively only.
 
-The load-bearing consequence: for any structure in this section, decoding and canonically re-encoding MUST reproduce the input bytes exactly. A verifier that performs this re-derivation check enforces the whole profile at once; the `enc.non_canonical_cbor` and `record.non_canonical` codes name its failures.
+The practical consequence: for any structure in this section, decoding and canonically re-encoding MUST reproduce the input bytes exactly. A verifier that performs this re-derivation check enforces the whole profile at once; the `enc.non_canonical_cbor` and `record.non_canonical` codes name its failures.
 
 ### 8.2 Event envelope
 
