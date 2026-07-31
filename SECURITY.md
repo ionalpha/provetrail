@@ -22,8 +22,8 @@ This repository is several surfaces with different failure modes. All are in sco
 ## Not a vulnerability
 
 - **The test signing key.** The `crypto/` conformance vectors are signed under a fixed Ed25519 key published in `vectors/crypto/manifest.json`. It is deliberately public and is not for production. Signing anything real with it, or "recovering" it, is expected, not a finding.
-- **Pre-freeze format change.** Until `v0.1.0` is tagged the on-the-wire format is a working draft (`SPEC.md` Section 7). A record produced against a pre-freeze draft failing under a later draft is expected behavior, not a vulnerability.
-- **Relying on a draft in production.** The specification states it MUST NOT be relied on as a production security control before the freeze. Doing so anyway is a deployment choice, not a defect in the standard.
+- **Pre-freeze records.** A record produced against a pre-freeze draft of the format (before `v0.1.0` was tagged) failing under the frozen format is expected behavior, not a vulnerability.
+- **Relying on a record beyond its scope.** The specification states what verification proves and does not prove (`SPEC.md` Section 9). Relying on a record beyond that scope is a deployment choice, not a defect in the standard.
 
 ## Handling
 

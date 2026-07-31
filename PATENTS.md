@@ -1,6 +1,6 @@
 # Patent non-assertion covenant
 
-**Status:** Draft (pre-1.0).
+**Status:** In effect (pre-1.0).
 
 ## Why this document exists
 

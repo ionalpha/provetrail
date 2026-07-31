@@ -1,10 +1,10 @@
 # Contributing to Provetrail
 
-Provetrail is an open, vendor-neutral standard for verifiable execution provenance. It is an early draft, and review is welcome.
+Provetrail is an open, vendor-neutral standard for verifiable execution provenance. Review is welcome.
 
 ## Status
 
-This is a pre-1.0 draft. The on-the-wire format is not frozen until `v0.1.0` is tagged, so changes to `SPEC.md`, `CONFORMANCE.md`, and the predicate definitions are expected. The cryptographic layer (the RFC 9162 Merkle log, COSE signing, and signed roots) is implemented in the reference implementation and exercised by the published vectors, so a record can be cryptographically verified against a signing key today; until the format freezes, treat any record as a draft artifact and do not rely on it as a production security control.
+The specification is frozen at `v0.1.0`: the on-the-wire format is a stable contract, and changes to `SPEC.md`, `CONFORMANCE.md`, and the predicate definitions land through the process in `GOVERNANCE.md` under the rules in `VERSIONING.md`. The cryptographic layer (the RFC 9162 Merkle log, COSE signing, and signed roots) is implemented in the reference implementation and exercised by the published vectors, so a record can be cryptographically verified against a signing key. What verification proves is scoped by the trust model in `SPEC.md` Section 9.
 
 ## Design philosophy
 

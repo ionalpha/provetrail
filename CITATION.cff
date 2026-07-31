@@ -6,7 +6,7 @@ abstract: >-
   Provetrail is an open, vendor-neutral standard for verifiable execution
   provenance: a portable, third-party-verifiable record of what an agent did,
   in what order, and under what governance, anchored to an append-only,
-  tamper-evident event log. This draft defines the record format, its
+  tamper-evident event log. This specification defines the record format, its
   canonicalization, and the conformance suite.
 authors:
   - name: "Ion Alpha"
@@ -14,8 +14,8 @@ authors:
 repository-code: "https://github.com/ionalpha/provetrail"
 url: "https://provetrail.org"
 license: CC-BY-4.0
-version: 0.1.0-draft
-date-released: "2026-06-29"
+version: 0.1.0
+date-released: "2026-08-01"
 identifiers:
   - type: doi
     value: "10.5281/zenodo.21044069"

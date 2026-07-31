@@ -4,7 +4,7 @@
 
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21044069-blue)](https://doi.org/10.5281/zenodo.21044069)
 
-> **Status: DRAFT (pre-1.0).** This repository publishes the specification, the conformance design, and the signed conformance vectors. A reference verifier ships in the Flynn runtime, and independent verifiers in Rust, Python, and JavaScript live in [`clients/`](./clients). The on-the-wire format is not frozen until v0.1.0, so nothing here should yet be relied on as a production security control. See [Status and roadmap](#status-and-roadmap).
+> **Status: v0.1.0, frozen.** This repository publishes the specification, the conformance design, and the signed conformance vectors. A reference verifier ships in the Flynn runtime, and independent verifiers in Rust, Python, and JavaScript live in [`clients/`](./clients). The on-the-wire format is frozen at v0.1.0: a record verifies the same way everywhere, and what verification proves is scoped by the trust model in `SPEC.md` Section 9. See [Status and roadmap](#status-and-roadmap).
 
 ---
 
@@ -52,7 +52,7 @@ Conformance is defined by a public test-vector suite (see [`CONFORMANCE.md`](./C
 ## Repository layout
 
 ```
-SPEC.md                      the specification (DRAFT v0.1.0)
+SPEC.md                      the specification (v0.1.0)
 CONFORMANCE.md               the conformance vector suite design + failure-code registry
 GLOSSARY.md                  one definition per term, shared across the documents
 predicates/run-provenance.md the run-provenance statement/predicate definition
@@ -78,7 +78,7 @@ A reference implementation and verifier ship in the [Flynn](https://github.com/i
 
 ## Status and roadmap
 
-This is an early public draft published to invite review and to fix the format before the cryptographic layer lands. In rough order:
+The format is frozen at v0.1.0. The road here, in the order it happened:
 
 - [x] Specification draft (primitives, canonicalization, proof artifact)
 - [x] Conformance suite design (tiers, taxonomy, failure-code registry)
@@ -86,9 +86,9 @@ This is an early public draft published to invite review and to fix the format b
 - [x] Cryptographic layer: Merkle log, COSE signing, signed roots (the point at which "verifiable" is a claim with teeth)
 - [x] Golden-pinned conformance vectors published in this repository (structural L1 and cryptographic L2-L4, in [`vectors/`](./vectors/))
 - [x] Independent verifiers in Rust, Python, and JavaScript, each checked against the published vectors
-- [ ] v0.1.0 tag and format freeze
+- [x] v0.1.0 tag and format freeze
 
-The cryptographic layer is implemented in the reference implementation, so a record can be cryptographically verified against a signing key today. The on-the-wire format is not frozen until v0.1.0, so do not rely on a Provetrail record as a production security control before then.
+The cryptographic layer is implemented in the reference implementation, so a record can be cryptographically verified against a signing key. What verification does and does not prove is stated in `SPEC.md` Section 9; a relying party's production decisions should start from the trust model there.
 
 ## Governance and policy
 
@@ -105,4 +105,4 @@ Specification prose is licensed under [CC-BY-4.0](./LICENSE-docs). Code, schemas
 
 ## Contributing
 
-This is a draft under active design. Issues and discussion are welcome. Please keep proposals grounded in the existing primitives above; the goal is to assemble proven building blocks, not to invent new cryptography.
+Issues and discussion are welcome. Please keep proposals grounded in the existing primitives above; the goal is to assemble proven building blocks, not to invent new cryptography.

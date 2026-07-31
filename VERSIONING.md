@@ -1,12 +1,12 @@
 # Versioning and stability policy
 
-**Status:** Draft (pre-1.0). Process document; the version string it governs lives in the specification surfaces, not here.
+**Status:** Process document (pre-1.0); the version string it governs lives in the specification surfaces, not here.
 
 This document states what a version number promises across each Provetrail surface, what counts as a breaking change, and what the `v0.1.0` freeze fixes. It expands `SPEC.md` Section 7; where the two differ, `SPEC.md` Section 7 is normative for the wire format and this document is normative for the process.
 
 ## What `v0.1.0` freezes
 
-The freeze charter is authoritative in `SPEC.md` Section 7. In summary, tagging `v0.1.0` fixes as a stable contract: the leaf preimage and its domain-separation tag; the event envelope field set and the deterministic-CBOR encoding profile; the container, checkpoint, event-proof, and consistency schemas; the COSE protected-header profile (algorithm `-19`, the `application/vnd.provetrail.*` content types, key-id semantics); the registered failure-code meanings; and the published vector bytes. After the freeze, none of these changes except through a version increment that says so.
+The freeze charter is authoritative in `SPEC.md` Section 7. In summary, tagging `v0.1.0` fixes as a stable contract: the leaf preimage and its domain-separation tag; the event envelope field set and the deterministic-CBOR encoding profile; the container, checkpoint, event-proof, and consistency schemas; the COSE protected-header profile (algorithm `-19`, the `application/vnd.provetrail.*` content types, key-id semantics); the registered failure-code meanings; and the published vector bytes. The name is frozen with them: `provetrail` appears in the domain tag and the content types, inside the signed bytes, so a rename is a breaking wire change (`DECISIONS.md` D1). After the freeze, none of these changes except through a version increment that says so.
 
 ## One version, several surfaces
 
