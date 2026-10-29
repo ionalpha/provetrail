@@ -1,7 +1,7 @@
 # Provetrail Specification
 
-**Version:** 0.1.0-draft
-**Status:** DRAFT. This document is a working draft published for review. It is not final, and the on-the-wire format is not frozen until v0.1.0 is tagged. See the status note in the README.
+**Version:** 0.1.0
+**Status:** FROZEN at v0.1.0. The on-the-wire format of this version is a stable contract; the freeze charter is in Section 7, and changes land only through the process in `GOVERNANCE.md` under the rules in `VERSIONING.md`.
 
 ## Conventions
 
@@ -11,7 +11,7 @@ Identifiers are written in `code font`. This document avoids implementation-spec
 
 `provetrail` is the only short token the standard defines. There is no separate media-type token, CLI verb, or header abbreviation: media types are `application/vnd.provetrail.*`, the domain-separation tag is `provetrail/event/v1\n` (Section 8.3), and the client packages are named `provetrail`. No new short token is minted.
 
-A note on maturity: the cryptographic layer (Sections 4.2 and 4.3) is implemented and shipped with a verifier in the reference implementation, so a record can be cryptographically verified against a signing key today. The on-the-wire format is not yet frozen, and the golden conformance vectors are still being published into this repository, so the format is a working draft and MUST NOT be relied on as a production security control before the v0.1.0 freeze.
+A note on maturity: the cryptographic layer (Sections 4.2 and 4.3) is implemented and shipped with a verifier in the reference implementation, the golden conformance vectors are published in this repository, and the on-the-wire format is frozen at v0.1.0. What verification proves, and what it does not, is stated in Section 9; a relying party's production decisions should start from the trust model there.
 
 ---
 
@@ -177,7 +177,9 @@ Adoption strategy is by composition: a Provetrail record references the identiti
 - **Predicate URI policy** (the SLSA/in-toto pattern; normative alongside `predicates/run-provenance.md`): a versioned predicate path is immutable once its specification version freezes. A breaking change to the statement mints the next path (`/v0.2`); at 1.0 the URI becomes `/v1` and verifiers accept both during migration; post-1.0 minor versions never change the URI and follow the in-toto monotonic principle. Old version paths stay resolvable forever.
 - Reserved for post-freeze minor versions, in this order of intent: a signed JSON profile (Sections 3.2 and 4.2), a SCITT-native statement carrier (`application/vnd.provetrail.statement+cose`, Section 4.2), the redacted-record container below, and the `/v0.2` candidate statement fields listed in the predicate document. A minor version adds; it never changes frozen bytes.
 - **Reserved redaction path** (normative reservation; no mechanism ships at v0.1): a future redacted-record form is a NEW container kind with its OWN media type, never a reinterpretation of `{events, checkpoint}`. In it, an elided event is carried as its 32-byte **leaf hash** in place of its canonical bytes; the leaf preimage of Section 8.3 is unchanged, so the signed root still verifies over any mix of carried and elided leaves. This works precisely because the leaf is `SHA-256(0x00 || entry)` over a framed entry: the hash can always stand in for the bytes. A v0.1 verifier encountering the new kind rejects it cleanly (`record.decode`; the container is closed, Section 8.5) and can never silently misinterpret it. Any such mechanism is further bound by the constraints of Section 9.4.
-- Before v0.1.0 is tagged, any part of this draft may change. After the freeze, the on-the-wire format is a stable contract.
+- **The v0.1.0 freeze charter.** Frozen at `v0.1.0`, changed only under the rules in `VERSIONING.md`: the leaf preimage constants of Section 8.3, including the domain tag string; the event envelope field set and the deterministic-encoding profile (Sections 3.2, 8.1, 8.2); the container, checkpoint, event-proof, and consistency schemas; the COSE protected-header profile (algorithm `-19`, the `application/vnd.provetrail.*` content types, `kid` semantics); the meanings of registered failure codes; and the published vector bytes (a minor version may add vectors, never mutate existing ones). The name is frozen as a consequence, not by convention: `provetrail` appears in the domain tag and the content types, inside the signed bytes, so a rename is a breaking wire change (`DECISIONS.md` D1).
+- **Not frozen at v0.1.0**, reserved or deferred per the bullets above: the statement/predicate body beyond the v0.1 ruling; the JSON profile; receipts carriage (the RFC 9942 pointer; no vectors at this version); the deferred L4 codes; the notary/attestation layer; and the reserved redacted-container kind.
+- The on-the-wire format of v0.1.0 is a stable contract.
 
 ---
 

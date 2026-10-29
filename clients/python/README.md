@@ -2,7 +2,7 @@
 
 A verifier for **Provetrail**, an open standard for verifiable execution provenance.
 
-> **Status: draft (`0.2.x`).** This package verifies the integrity tier of a sealed run record: the COSE_Sign1 checkpoint signature and the RFC 9162 Merkle root over the carried events. The on-the-wire format is not frozen until **specification** v0.1.0 (the spec's version, not this package's), so do not yet rely on it as a production security control.
+> **Status: `0.3.x`.** This package verifies the integrity tier of a sealed run record: the COSE_Sign1 checkpoint signature and the RFC 9162 Merkle root over the carried events. The on-the-wire format is frozen at **specification** v0.1.0 (the spec's version, not this package's); what verification proves is scoped by the specification's trust model.
 
 ## What Provetrail is
 
@@ -51,7 +51,7 @@ pip install provetrail[test]
 pytest
 ```
 
-The cryptographic vectors live in [`vectors/crypto`](https://github.com/ionalpha/provetrail/tree/main/vectors/crypto). This client verifies the integrity tiers (L1-L3) against conformance suite `0.1.0-draft`; it does not enforce L4 (governance and ground truth), so an L4-claiming record needs an L4 verifier. The reference verifier covering every tier (L1-L4; in the documented shorthand, integrity = L1-L3 and governance + ground truth = L4) ships in the Go runtime at [`ionalpha/flynn`](https://github.com/ionalpha/flynn).
+The cryptographic vectors live in [`vectors/crypto`](https://github.com/ionalpha/provetrail/tree/main/vectors/crypto). This client verifies the integrity tiers (L1-L3) against conformance suite `0.1.0`; it does not enforce L4 (governance and ground truth), so an L4-claiming record needs an L4 verifier. The reference verifier covering every tier (L1-L4; in the documented shorthand, integrity = L1-L3 and governance + ground truth = L4) ships in the Go runtime at [`ionalpha/flynn`](https://github.com/ionalpha/flynn).
 
 ## License
 
